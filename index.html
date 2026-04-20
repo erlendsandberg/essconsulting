@@ -1860,6 +1860,8 @@ let DB = {
   // Betalingsanmerkninger registrert mot overvåkede selskaper.
   // { id, orgNr, regDate (YYYY-MM-DD), type, amount, source, refNr, status, creditor, ingestedAt }
   creditAlerts:     [],
+  // App-konfigurasjon: ingestToken (bruker setter én gang), lastIngest (satt av ingest-API)
+  config:           { ingestToken: '', lastIngest: '' },
 };
 
 // Maks antall aktivitetslogg-entries vi beholder. Firestore-dokumentet har
@@ -1904,6 +1906,7 @@ function persistAll(opts = {}) {
         documents:        DB.documents,
         watchedCompanies: DB.watchedCompanies,
         creditAlerts:     DB.creditAlerts,
+        config:           DB.config,
         _savedAt:  new Date().toISOString(),
       });
       if (toast) showToast(toast, 'success');
@@ -1969,6 +1972,7 @@ function restoreLocalSnapshot(index) {
         DB.documents        = data.documents        || [];
         DB.watchedCompanies = data.watchedCompanies || [];
         DB.creditAlerts     = data.creditAlerts     || [];
+        DB.config           = data.config           || { ingestToken: '', lastIngest: '' };
         persistAll({toast: 'Gjenopprettet fra lokal snapshot'});
         navigate('dashboard');
       } catch (e) {
@@ -1991,6 +1995,7 @@ async function loadAll() {
       DB.documents        = d.documents        || [];
       DB.watchedCompanies = d.watchedCompanies || [];
       DB.creditAlerts     = d.creditAlerts     || [];
+      DB.config           = d.config           || { ingestToken: '', lastIngest: '' };
     }
     // else: første gang — tomt DB, vis demodata
   } catch(err) {
@@ -6186,6 +6191,17 @@ function runScraperProtocol() {
   window.location.href = 'forvalt-scraper://run';
 }
 
+function toggleIngestTokenVisibility() {
+  const inp = document.getElementById('ingestTokenInput');
+  if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function copyIngestToken() {
+  const token = DB.config?.ingestToken || '';
+  if (!token) { showToast('Ingen token lagret ennå', 'info'); return; }
+  navigator.clipboard.writeText(token).then(() => showToast('Token kopiert', 'success'));
+}
+
 function showScraperSetup() {
   document.getElementById('modal').style.maxWidth = '560px';
   document.getElementById('modalTitle').textContent = 'Oppsett: forvalt-scraper';
@@ -6397,14 +6413,27 @@ function renderSettings() {
       </div>
       <div class="settings-card">
         <h3>🔑 Ingest-token (API)</h3>
-        <p>Token din automatiserte tjeneste skal sende i <code>X-Ingest-Token</code>-header til <code>/.netlify/functions/anmerkninger-ingest</code>. Konfigureres i Netlify som miljøvariabel <code>INGEST_TOKEN</code>.</p>
+        <p>Shared secret for ingest-APIet. Lim inn her for enkel kopiering.</p>
+        <div style="display:flex;gap:6px;margin:8px 0">
+          <input id="ingestTokenInput" type="password" class="form-control" style="flex:1;font-family:monospace;font-size:12px"
+            placeholder="Lim inn token…"
+            value="${escHtml(DB.config?.ingestToken || '')}"
+            oninput="DB.config.ingestToken=this.value;persistAll()">
+          <button class="btn btn-secondary btn-sm" title="Vis/skjul" onclick="toggleIngestTokenVisibility()">👁</button>
+          <button class="btn btn-secondary btn-sm" title="Kopier" onclick="copyIngestToken()">📋</button>
+        </div>
         <button class="btn btn-secondary w-full" onclick="showIngestDocs()">Vis API-dokumentasjon</button>
       </div>
       <div class="settings-card">
         <h3>▶ Kjør scraper manuelt</h3>
         <p>Hent nye betalingsanmerkninger fra forvalt.no nå. Kjører automatisk mandag kl. 07:00.</p>
         <button class="btn btn-primary w-full" onclick="runScraperProtocol()">Kjør forvalt-scraper nå</button>
-        <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">Krever at <span class="td-link" onclick="showScraperSetup()">register-protocol.reg</span> er kjørt én gang.</div>
+        <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+          ${DB.config?.lastIngest
+            ? `Sist kjørt: ${fmtDate(DB.config.lastIngest)} kl. ${new Date(DB.config.lastIngest).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'})}`
+            : 'Aldri kjørt (ingen data mottatt ennå)'}
+        </div>
+        <div style="margin-top:4px;font-size:12px;color:var(--text-muted)">Krever at <span class="td-link" onclick="showScraperSetup()">register-protocol.reg</span> er kjørt én gang.</div>
       </div>
     </div>
   </div>
@@ -8205,6 +8234,7 @@ function importData(event) {
       DB.documents        = data.documents        || [];
       DB.watchedCompanies = data.watchedCompanies || [];
       DB.creditAlerts     = data.creditAlerts     || [];
+      DB.config           = data.config           || { ingestToken: '', lastIngest: '' };
       persistAll({toast: 'Data importert!'});
       navigate('dashboard');
     } catch(err) {
@@ -8220,6 +8250,7 @@ function resetAllData() {
     customers: [], projects: [], tasks: [], notes: [],
     activityLog: [], documents: [],
     watchedCompanies: [], creditAlerts: [],
+    config: { ingestToken: '', lastIngest: '' },
   };
   persistAll({toast: 'Alle data nullstilt'});
   navigate('dashboard');

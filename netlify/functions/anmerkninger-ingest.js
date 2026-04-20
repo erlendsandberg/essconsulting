@@ -118,12 +118,14 @@ exports.handler = async (event) => {
     });
   }
 
+  const updatePayload = {
+    _savedAt:   ingestedAt,
+    'config.lastIngest': ingestedAt,
+  };
   if (newAlerts.length) {
-    await ref.update({
-      creditAlerts: [...existing, ...newAlerts],
-      _savedAt: ingestedAt,
-    });
+    updatePayload.creditAlerts = [...existing, ...newAlerts];
   }
+  await ref.update(updatePayload);
 
   return jsonResponse(200, {
     added:   newAlerts.length,
