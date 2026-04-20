@@ -6228,6 +6228,14 @@ function renderSettings() {
         <p>Token din automatiserte tjeneste skal sende i <code>X-Ingest-Token</code>-header til <code>/.netlify/functions/anmerkninger-ingest</code>. Konfigureres i Netlify som miljøvariabel <code>INGEST_TOKEN</code>.</p>
         <button class="btn btn-secondary w-full" onclick="showIngestDocs()">Vis API-dokumentasjon</button>
       </div>
+      <div class="settings-card">
+        <h3>▶ Kjør scraper manuelt</h3>
+        <p>Åpne terminal og kjør:</p>
+        <pre style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;white-space:pre-wrap;margin:8px 0;user-select:all">cd "C:\\Users\\ErlendSynnes-Sandber\\OneDrive - ESS Consulting AS\\ESSC\\AI\\Claude Code\\forvalt.no"
+.\\venv\\Scripts\\activate
+python main.py --no-email</pre>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Eller dobbeltklikk på <strong>kjør-scraper.bat</strong> i forvalt.no-mappen. Automatisk kjøring skjer mandag kl. 07:00 via Windows Oppgaveplanlegger.</p>
+      </div>
     </div>
   </div>
 
