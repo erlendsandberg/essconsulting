@@ -6066,7 +6066,9 @@ function convertWatchedToCustomer(orgNr) {
    ============================================================ */
 function renderAnmerkninger() {
   const search = (window._alertSearch || '').toLowerCase();
-  const days = parseInt(window._alertDays || '0', 10); // 0 = alle
+  const days = parseInt(window._alertDays || '0', 10);
+  const sortCol = window._alertSortCol || 'regDate';
+  const sortDir = window._alertSortDir || 'desc';
   const cutoffIso = days > 0 ? (() => {
     const c = new Date(); c.setDate(c.getDate() - days); return c.toISOString().slice(0, 10);
   })() : '';
@@ -6080,9 +6082,29 @@ function renderAnmerkninger() {
       return [name, a.orgNr, a.creditor, a.source, a.type, a.refNr]
         .some(v => String(v || '').toLowerCase().includes(search));
     })
-    .sort((a, b) => (b.regDate || '').localeCompare(a.regDate || ''));
+    .sort((a, b) => {
+      let va, vb;
+      if (sortCol === 'amount') {
+        va = a.amount || 0; vb = b.amount || 0;
+      } else if (sortCol === 'company') {
+        const wa = findCompanyByOrgNr(a.orgNr); const wb = findCompanyByOrgNr(b.orgNr);
+        va = (wa?.watched?.name || wa?.customer?.name || a.orgNr).toLowerCase();
+        vb = (wb?.watched?.name || wb?.customer?.name || b.orgNr).toLowerCase();
+      } else {
+        va = String(a[sortCol] || ''); vb = String(b[sortCol] || '');
+      }
+      const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
 
   const totalAmount = filtered.reduce((s, a) => s + (a.amount || 0), 0);
+
+  const thSort = (col, label, align) => {
+    const active = sortCol === col;
+    const arrow = active ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
+    const style = `cursor:pointer;user-select:none;white-space:nowrap${align ? ';text-align:' + align : ''}${active ? ';color:var(--blue)' : ''}`;
+    return `<th style="${style}" onclick="setAlertSort('${col}')">${label}${arrow}</th>`;
+  };
 
   const rows = filtered.map(a => {
     const w = findCompanyByOrgNr(a.orgNr);
@@ -6109,11 +6131,18 @@ function renderAnmerkninger() {
   const tableOrEmpty = filtered.length ? `
     <table class="data-table">
       <thead><tr>
-        <th>Dato</th><th>Selskap</th><th>Type</th><th style="text-align:right">Beløp</th><th>Kreditor</th><th>Kilde</th><th>Status</th><th></th>
+        ${thSort('regDate','Dato')}
+        ${thSort('company','Selskap')}
+        ${thSort('type','Type')}
+        ${thSort('amount','Beløp','right')}
+        ${thSort('creditor','Kreditor')}
+        ${thSort('source','Kilde')}
+        ${thSort('status','Status')}
+        <th></th>
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot>
-        <tr><td colspan="3" style="text-align:right;font-weight:600">Sum:</td>
+        <tr><td colspan="3" style="text-align:right;font-weight:600">Sum (${filtered.length}):</td>
             <td style="text-align:right;font-weight:600">${fmtNOK(totalAmount)}</td>
             <td colspan="4"></td></tr>
       </tfoot>
@@ -6127,7 +6156,11 @@ function renderAnmerkninger() {
   return `
   <div class="page-header">
     <h1>⚠️ Betalingsanmerkninger</h1>
-    <div style="color:var(--text-muted);font-size:13px">${DB.creditAlerts.length} totalt</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="color:var(--text-muted);font-size:13px">${filtered.length} av ${DB.creditAlerts.length} totalt</span>
+      <button class="btn btn-secondary btn-sm" onclick="exportAlertsCsv()">Eksporter CSV</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportAlertsPdf()">Eksporter PDF</button>
+    </div>
   </div>
   <div class="card mb-24">
     <div class="card-body" style="padding:12px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
@@ -6147,6 +6180,125 @@ function renderAnmerkninger() {
 
 function setAlertSearch(v) { window._alertSearch = v; _debouncedRender(); }
 function setAlertDays(v)   { window._alertDays   = v; render(); }
+
+function runScraperProtocol() {
+  showToast('Starter forvalt-scraper…', 'info');
+  window.location.href = 'forvalt-scraper://run';
+}
+function setAlertSort(col) {
+  if (window._alertSortCol === col) {
+    window._alertSortDir = window._alertSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    window._alertSortCol = col;
+    window._alertSortDir = col === 'amount' ? 'desc' : col === 'regDate' ? 'desc' : 'asc';
+  }
+  render();
+}
+
+function _alertsFiltered() {
+  const search = (window._alertSearch || '').toLowerCase();
+  const days = parseInt(window._alertDays || '0', 10);
+  const sortCol = window._alertSortCol || 'regDate';
+  const sortDir = window._alertSortDir || 'desc';
+  const cutoffIso = days > 0 ? (() => {
+    const c = new Date(); c.setDate(c.getDate() - days); return c.toISOString().slice(0, 10);
+  })() : '';
+  return DB.creditAlerts
+    .filter(a => !cutoffIso || (a.regDate || '') >= cutoffIso)
+    .filter(a => {
+      if (!search) return true;
+      const w = findCompanyByOrgNr(a.orgNr);
+      const name = w?.watched?.name || w?.customer?.name || '';
+      return [name, a.orgNr, a.creditor, a.source, a.type, a.refNr]
+        .some(v => String(v || '').toLowerCase().includes(search));
+    })
+    .sort((a, b) => {
+      let va, vb;
+      if (sortCol === 'amount') { va = a.amount || 0; vb = b.amount || 0; }
+      else if (sortCol === 'company') {
+        const wa = findCompanyByOrgNr(a.orgNr); const wb = findCompanyByOrgNr(b.orgNr);
+        va = (wa?.watched?.name || wa?.customer?.name || a.orgNr).toLowerCase();
+        vb = (wb?.watched?.name || wb?.customer?.name || b.orgNr).toLowerCase();
+      } else { va = String(a[sortCol] || ''); vb = String(b[sortCol] || ''); }
+      const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+}
+
+function exportAlertsCsv() {
+  const data = _alertsFiltered();
+  if (!data.length) { showToast('Ingen anmerkninger å eksportere', 'info'); return; }
+  const headers = ['Dato','Orgnr','Selskap','Type','Beløp','Kreditor','Kilde','Referansenr','Status'];
+  const csvRows = [headers.join(';')];
+  data.forEach(a => {
+    const w = findCompanyByOrgNr(a.orgNr);
+    const name = w?.watched?.name || w?.customer?.name || '';
+    csvRows.push([
+      a.regDate || '', a.orgNr || '', name,
+      a.type || '', String(a.amount || ''), a.creditor || '',
+      a.source || '', a.refNr || '', a.status || ''
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(';'));
+  });
+  const blob = new Blob(['\uFEFF' + csvRows.join('\r\n')], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `betalingsanmerkninger_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast(`Eksporterte ${data.length} anmerkninger`, 'success');
+}
+
+function exportAlertsPdf() {
+  const data = _alertsFiltered();
+  if (!data.length) { showToast('Ingen anmerkninger å eksportere', 'info'); return; }
+  if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = () => _doExportAlertsPdf(data);
+    document.head.appendChild(s);
+    return;
+  }
+  _doExportAlertsPdf(data);
+}
+
+function _doExportAlertsPdf(data) {
+  const { jsPDF } = window.jspdf || window;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const today = new Date().toLocaleDateString('nb-NO');
+  doc.setFontSize(14); doc.setFont('helvetica','bold');
+  doc.text('Betalingsanmerkninger', 14, 16);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text(`Eksportert ${today} · ${data.length} anmerkninger`, 14, 22);
+
+  const cols = ['Dato','Selskap','Orgnr','Type','Beløp (NOK)','Kreditor','Status'];
+  const colW = [22, 52, 26, 30, 26, 46, 24];
+  let y = 30;
+  doc.setFillColor(240,240,240); doc.rect(14, y-5, 269, 7, 'F');
+  doc.setFontSize(8); doc.setFont('helvetica','bold');
+  let x = 14;
+  cols.forEach((c,i) => { doc.text(c, x+1, y); x += colW[i]; });
+  y += 4;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+  data.forEach((a, idx) => {
+    if (y > 190) { doc.addPage(); y = 16; }
+    if (idx % 2 === 0) { doc.setFillColor(250,250,250); doc.rect(14, y-4, 269, 6, 'F'); }
+    const w = findCompanyByOrgNr(a.orgNr);
+    const name = w?.watched?.name || w?.customer?.name || '';
+    const vals = [
+      fmtDate(a.regDate), name, fmtOrgNr(a.orgNr),
+      a.type || '', a.amount ? Math.round(a.amount).toLocaleString('nb-NO') : '',
+      a.creditor || '', a.status || ''
+    ];
+    x = 14;
+    vals.forEach((v,i) => {
+      const maxW = colW[i] - 2;
+      const txt = doc.splitTextToSize(String(v), maxW)[0] || '';
+      doc.text(txt, x+1, y); x += colW[i];
+    });
+    y += 6;
+  });
+  doc.save(`betalingsanmerkninger_${new Date().toISOString().slice(0,10)}.pdf`);
+  showToast(`PDF eksportert (${data.length} rader)`, 'success');
+}
 
 function renderSettings() {
   return `
@@ -6230,11 +6382,15 @@ function renderSettings() {
       </div>
       <div class="settings-card">
         <h3>▶ Kjør scraper manuelt</h3>
-        <p>Åpne terminal og kjør:</p>
-        <pre style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;white-space:pre-wrap;margin:8px 0;user-select:all">cd "C:\\Users\\ErlendSynnes-Sandber\\OneDrive - ESS Consulting AS\\ESSC\\AI\\Claude Code\\forvalt.no"
+        <p>Klikk for å starte scraping av forvalt.no direkte fra denne siden (krever at <code>register-protocol.reg</code> er kjørt én gang på maskinen din).</p>
+        <button class="btn btn-primary w-full" onclick="runScraperProtocol()">Kjør forvalt-scraper nå</button>
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Alternativt — dobbeltklikk bat-filen eller kjør i terminal:</p>
+          <pre style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;white-space:pre-wrap;user-select:all">cd "C:\\Users\\ErlendSynnes-Sandber\\OneDrive - ESS Consulting AS\\ESSC\\AI\\Claude Code\\forvalt.no"
 .\\venv\\Scripts\\activate
 python main.py --no-email</pre>
-        <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Eller dobbeltklikk på <strong>kjør-scraper.bat</strong> i forvalt.no-mappen. Automatisk kjøring skjer mandag kl. 07:00 via Windows Oppgaveplanlegger.</p>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:6px">Automatisk kjøring skjer mandag kl. 07:00 via Windows Oppgaveplanlegger.</p>
+        </div>
       </div>
     </div>
   </div>
