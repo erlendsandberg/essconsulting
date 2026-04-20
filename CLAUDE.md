@@ -30,7 +30,7 @@ ess-consulting/
 | `INGEST_TOKEN` | `anmerkninger-ingest.js` | Shared secret for innsending av betalingsanmerkninger |
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | `anmerkninger-ingest.js` | Komplett service-account-JSON fra Firebase Console (Project Settings → Service Accounts) |
 
-**Hosting:** Netlify (deploy ved å dra mappen inn i Netlify-dashbordet)
+**Hosting:** Netlify (auto-deploy fra GitHub `main`-branch)
 **Database:** Google Firebase Firestore (compat SDK v10.12.0)
 **AI:** Anthropic Claude via Netlify Function-proxy (`/.netlify/functions/ai`)
 **Styling:** Tailwind CSS via CDN + egne CSS-variabler
@@ -315,8 +315,19 @@ node --check /tmp/check.js
 ```
 
 ### Deploy til Netlify
-Dra `ess-consulting/`-mappen inn i Netlify-dashbordet (ikke ZIP).
-Miljøvariabel `ANTHROPIC_API_KEY` må være satt i Netlify → Site settings → Environment variables.
+**Auto-deploy:** push til `main` på GitHub-repoet `erlendsandberg/essconsulting` —
+Netlify bygger og publiserer automatisk innen 1–2 min.
+
+```bash
+git add .
+git commit -m "Beskriv endringen"
+git push
+```
+
+Miljøvariabler som må være satt i Netlify → Site settings → Environment variables:
+- `ANTHROPIC_API_KEY` (Claude API)
+- `INGEST_TOKEN` (shared secret for anmerkninger-ingest)
+- `GOOGLE_APPLICATION_CREDENTIALS_JSON` (Firebase Admin service account)
 
 ---
 
