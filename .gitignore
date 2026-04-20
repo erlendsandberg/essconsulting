@@ -1,0 +1,23 @@
+# Node / Netlify Functions
+node_modules/
+.netlify/
+.env
+.env.*
+!.env.example
+
+# Eksporterte data-backups (bør ikke i versjonskontroll)
+ess-backup-*.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logger
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~

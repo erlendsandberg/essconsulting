@@ -1,0 +1,9 @@
+{
+  "name": "ess-consulting-functions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Netlify Functions for ESS Consulting (auto-installeres av Netlify ved deploy)",
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}
