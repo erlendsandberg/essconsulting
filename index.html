@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ESS Consulting AS – Prosjektstyring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
 <!-- Firebase compat SDK (vanlige script-tagger, ingen module-timing-problemer) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -30,36 +33,36 @@
    CSS VARIABLER OG RESET
    ============================================================ */
 :root {
-  --navy:        #0F1D2E;
-  --navy-light:  #162639;
-  --navy-hover:  #1E3451;
-  --blue:        #2563EB;
-  --blue-light:  #3B82F6;
-  --blue-pale:   #EFF6FF;
-  --green:       #10B981;
-  --green-pale:  #ECFDF5;
-  --yellow:      #F59E0B;
-  --yellow-pale: #FFFBEB;
-  --orange:      #F97316;
-  --orange-pale: #FFF7ED;
-  --red:         #EF4444;
-  --red-pale:    #FEF2F2;
-  --grey:        #6B7280;
-  --grey-light:  #9CA3AF;
-  --grey-pale:   #F3F4F6;
-  --border:      #E5E7EB;
+  --navy:        #1B2A4A;
+  --navy-light:  #223459;
+  --navy-hover:  #2A3F66;
+  --blue:        #2E75B6;
+  --blue-light:  #4A90CC;
+  --blue-pale:   #E6F1FB;
+  --green:       #1D6B54;
+  --green-pale:  #E1F5EE;
+  --yellow:      #C4793A;
+  --yellow-pale: #FDF6ED;
+  --orange:      #C4793A;
+  --orange-pale: #FDF6ED;
+  --red:         #C0392B;
+  --red-pale:    #FDECEA;
+  --grey:        #7A7168;
+  --grey-light:  #A09890;
+  --grey-pale:   #F5F4F0;
+  --border:      #E0DDD6;
   --white:       #FFFFFF;
-  --text:        #111827;
-  --text-muted:  #6B7280;
-  --bg:          #F1F5F9;
-  --card:        #FFFFFF;
-  --shadow-sm:   0 1px 3px rgba(0,0,0,0.08);
-  --shadow:      0 4px 16px rgba(0,0,0,0.08);
-  --shadow-md:   0 8px 32px rgba(0,0,0,0.12);
-  --radius:      10px;
+  --text:        #1B2A4A;
+  --text-muted:  #7A7168;
+  --bg:          #F5F4F0;
+  --card:        #FAFAF8;
+  --shadow-sm:   0 1px 3px rgba(27,42,74,0.07);
+  --shadow:      0 4px 16px rgba(27,42,74,0.08);
+  --shadow-md:   0 8px 32px rgba(27,42,74,0.12);
+  --radius:      12px;
   --sidebar-w:   240px;
   --header-h:    60px;
-  --font:        'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font:        'DM Sans', system-ui, -apple-system, sans-serif;
   --font-mono:   'Consolas', 'Courier New', monospace;
 }
 
@@ -153,7 +156,7 @@ ul { list-style: none; }
 /* TOPBAR */
 #topbar {
   height: var(--header-h);
-  background: var(--white);
+  background: var(--card);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -180,8 +183,8 @@ ul { list-style: none; }
   transition: all 0.15s;
   white-space: nowrap;
 }
-.btn-primary { background: var(--blue); color: #fff; }
-.btn-primary:hover { background: var(--blue-light); }
+.btn-primary { background: var(--navy); color: #fff; }
+.btn-primary:hover { background: var(--navy-hover); }
 .btn-secondary { background: var(--grey-pale); color: var(--text); }
 .btn-secondary:hover { background: var(--border); }
 .btn-danger { background: var(--red-pale); color: var(--red); }
@@ -221,20 +224,20 @@ ul { list-style: none; }
   white-space: nowrap;
 }
 .badge::before { content: '●'; font-size: 8px; }
-.badge-ikke-startet { background: #F3F4F6; color: #6B7280; }
+.badge-ikke-startet { background: #F5F4F0; color: #7A7168; }
 .badge-pagar        { background: var(--blue-pale); color: var(--blue); }
-.badge-venter-kunde { background: var(--yellow-pale); color: #92400E; }
-.badge-venter-leveranse { background: var(--orange-pale); color: #9A3412; }
-.badge-klar-avslutning  { background: var(--green-pale); color: #065F46; }
-.badge-avsluttet    { background: #F3F4F6; color: #374151; }
-.badge-fullfort     { background: var(--green-pale); color: #065F46; }
+.badge-venter-kunde { background: var(--yellow-pale); color: #7A3B1E; }
+.badge-venter-leveranse { background: var(--orange-pale); color: #7A3B1E; }
+.badge-klar-avslutning  { background: var(--green-pale); color: #0D4A38; }
+.badge-avsluttet    { background: #F5F4F0; color: #2A3344; }
+.badge-fullfort     { background: var(--green-pale); color: #0D4A38; }
 .badge-overdue      { background: var(--red-pale); color: var(--red); }
 
 /* TASK STATUS */
 .task-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.task-badge.ikke-startet { background: #F3F4F6; color: #6B7280; }
+.task-badge.ikke-startet { background: #F5F4F0; color: #7A7168; }
 .task-badge.pagar        { background: var(--blue-pale); color: var(--blue); }
-.task-badge.avventer     { background: var(--yellow-pale); color: #78350F; }
+.task-badge.avventer     { background: var(--yellow-pale); color: #7A3B1E; }
 .task-badge.fullfort     { background: var(--green-pale); color: var(--green); }
 
 /* ============================================================
@@ -280,19 +283,19 @@ ul { list-style: none; }
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #2563EB, #06b6d4, #10b981);
+  background: linear-gradient(90deg, #2E75B6, #1D6B54);
 }
-.vera-card.mode-green::before { background: linear-gradient(90deg,#10b981,#059669); }
-.vera-card.mode-yellow::before { background: linear-gradient(90deg,#f59e0b,#d97706); }
+.vera-card.mode-green::before { background: linear-gradient(90deg,#1D6B54,#1D6B54); }
+.vera-card.mode-yellow::before { background: linear-gradient(90deg,#C4793A,#C4793A); }
 .vera-card.mode-red::before { background: linear-gradient(90deg,#ef4444,#dc2626); }
 
 .vera-avatar {
   width: 38px; height: 38px;
-  background: linear-gradient(135deg,#2563EB,#06b6d4);
+  background: linear-gradient(135deg,#2E75B6,#1D6B54);
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(37,99,235,0.4);
+  box-shadow: 0 2px 8px rgba(46,117,182,0.35);
 }
 .vera-body { flex: 1; min-width: 0; }
 .vera-header {
@@ -306,7 +309,7 @@ ul { list-style: none; }
   font-size: 10.5px; font-weight: 600; padding: 2px 8px;
   border-radius: 20px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4);
 }
-.vera-mode-badge.green { background:rgba(16,185,129,0.18); color:#6ee7b7; }
+.vera-mode-badge.green { background:rgba(29,107,84,0.18); color:#3DA882; }
 .vera-mode-badge.yellow { background:rgba(245,158,11,0.18); color:#fcd34d; }
 .vera-mode-badge.red { background:rgba(239,68,68,0.18); color:#fca5a5; }
 
@@ -356,16 +359,16 @@ ul { list-style: none; }
 #vera-fab {
   position: fixed; bottom: 28px; right: 28px; z-index: 8000;
   width: 52px; height: 52px; border-radius: 50%;
-  background: linear-gradient(135deg,#2563EB,#06b6d4);
-  border: none; cursor: pointer; box-shadow: 0 4px 20px rgba(37,99,235,0.5);
+  background: linear-gradient(135deg,#2E75B6,#1D6B54);
+  border: none; cursor: pointer; box-shadow: 0 4px 20px rgba(27,42,74,0.35);
   font-size: 22px; display: flex; align-items: center; justify-content: center;
   transition: transform .2s, box-shadow .2s;
 }
-#vera-fab:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(37,99,235,0.65); }
+#vera-fab:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(27,42,74,0.5); }
 #vera-fab .vera-fab-badge {
   position: absolute; top: -2px; right: -2px;
   width: 14px; height: 14px; border-radius: 50%;
-  background: #10b981; border: 2px solid var(--navy);
+  background: #1D6B54; border: 2px solid var(--navy);
   display: none;
 }
 #vera-fab .vera-fab-badge.show { display: block; }
@@ -373,7 +376,7 @@ ul { list-style: none; }
 #vera-chat {
   position: fixed; bottom: 90px; right: 28px; z-index: 8000;
   width: 370px; max-width: calc(100vw - 40px);
-  background: #162639; border-radius: 16px;
+  background: #223459; border-radius: 16px;
   box-shadow: 0 12px 48px rgba(0,0,0,0.45);
   display: flex; flex-direction: column;
   overflow: hidden; border: 1px solid rgba(255,255,255,0.08);
@@ -394,7 +397,7 @@ ul { list-style: none; }
 }
 .vera-chat-head-avatar {
   width: 32px; height: 32px; border-radius: 50%;
-  background: linear-gradient(135deg,#2563EB,#06b6d4);
+  background: linear-gradient(135deg,#2E75B6,#1D6B54);
   display: flex; align-items: center; justify-content: center;
   font-size: 15px; flex-shrink: 0;
 }
@@ -420,7 +423,7 @@ ul { list-style: none; }
 }
 @keyframes veraMsgIn { from { opacity:0; transform:translateY(6px); } }
 .vera-msg.vera  { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.9); align-self:flex-start; border-radius: 4px 12px 12px 12px; }
-.vera-msg.user  { background: #2563EB; color: #fff; align-self:flex-end; border-radius: 12px 4px 12px 12px; }
+.vera-msg.user  { background: #2E75B6; color: #fff; align-self:flex-end; border-radius: 12px 4px 12px 12px; }
 .vera-msg.vera-loading { background: rgba(255,255,255,0.06); align-self: flex-start; }
 
 /* Forslagskort */
@@ -449,11 +452,11 @@ ul { list-style: none; }
   padding: 9px 12px; resize: none; outline: none; min-height: 38px; max-height: 120px;
   font-family: inherit; transition: border-color .15s;
 }
-#vera-input:focus { border-color: #2563EB; }
+#vera-input:focus { border-color: #2E75B6; }
 #vera-input::placeholder { color: rgba(255,255,255,0.28); }
 #vera-send {
   width: 36px; height: 36px; border-radius: 8px;
-  background: #2563EB; border: none; cursor: pointer;
+  background: #2E75B6; border: none; cursor: pointer;
   color: #fff; font-size: 16px; display: flex;
   align-items: center; justify-content: center;
   flex-shrink: 0; transition: background .15s;
@@ -532,7 +535,7 @@ ul { list-style: none; }
   grid-template-columns: 4px 1fr auto;
   align-items: center;
   gap: 0;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid #F5F4F0;
   cursor: pointer;
   transition: background 0.12s;
   text-decoration: none;
@@ -821,7 +824,7 @@ th {
 }
 td {
   padding: 12px 14px;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid #F5F4F0;
   vertical-align: middle;
 }
 tr:last-child td { border-bottom: none; }
@@ -892,8 +895,8 @@ tr:hover td { background: #FAFAFA; }
   font-size: 13px;
 }
 .alert-item.red   { background: var(--red-pale);    border-color: #FECACA; color: #991B1B; }
-.alert-item.yellow{ background: var(--yellow-pale); border-color: #FDE68A; color: #78350F; }
-.alert-item.orange{ background: var(--orange-pale); border-color: #FED7AA; color: #9A3412; }
+.alert-item.yellow{ background: var(--yellow-pale); border-color: #FDE68A; color: #7A3B1E; }
+.alert-item.orange{ background: var(--orange-pale); border-color: #FED7AA; color: #7A3B1E; }
 .alert-icon { font-size: 16px; }
 .alert-text { flex: 1; }
 .alert-text strong { display: block; font-weight: 600; }
@@ -1079,7 +1082,7 @@ tr:hover td { background: #FAFAFA; }
   align-items: center;
   gap: 8px;
 }
-.toast.success { background: #065F46; }
+.toast.success { background: #0D4A38; }
 .toast.error   { background: #991B1B; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -1191,7 +1194,7 @@ tr:hover td { background: #FAFAFA; }
   margin-left: 2px;
 }
 .fu-tab-count.red    { background: var(--red-pale);    color: var(--red); }
-.fu-tab-count.yellow { background: var(--yellow-pale); color: #92400E; }
+.fu-tab-count.yellow { background: var(--yellow-pale); color: #7A3B1E; }
 .fu-tab-count.blue   { background: var(--blue-pale);   color: var(--blue); }
 .fu-tab-count.grey   { background: var(--grey-pale);   color: var(--text-muted); }
 .fu-table { width: 100%; border-collapse: collapse; }
@@ -1209,7 +1212,7 @@ tr:hover td { background: #FAFAFA; }
 }
 .fu-row {
   cursor: pointer;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid #F5F4F0;
   transition: background 0.12s;
 }
 .fu-row:last-child { border-bottom: none; }
@@ -1474,7 +1477,7 @@ tr:hover td { background: #FAFAFA; }
   align-items: flex-start;
   gap: 10px;
   padding: 11px 14px;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid #F5F4F0;
   cursor: pointer;
   transition: background 0.12s;
 }
@@ -1543,7 +1546,7 @@ tr:hover td { background: #FAFAFA; }
 .fu-task-row {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 16px 9px 14px;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid #F5F4F0;
   cursor: pointer; transition: background 0.12s;
 }
 .fu-task-row:last-child { border-bottom: none; }
@@ -1555,7 +1558,7 @@ tr:hover td { background: #FAFAFA; }
 .fu-task-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 11.5px; color: var(--text-muted); }
 .fu-phase-chip {
   display: inline-block; font-size: 10px; font-weight: 700;
-  background: #F3F4F6; color: var(--text-muted);
+  background: #F5F4F0; color: var(--text-muted);
   border-radius: 4px; padding: 1px 6px; text-transform: uppercase; letter-spacing: 0.04em;
 }
 
@@ -1603,7 +1606,7 @@ tr:hover td { background: #FAFAFA; }
 }
 .brreg-item {
   padding: 11px 14px;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid #F5F4F0;
   cursor: pointer;
   transition: background 0.12s;
 }
@@ -1666,12 +1669,12 @@ tr:hover td { background: #FAFAFA; }
 
 /* ── Login-skjerm ── */
 #login-screen {
-  position: fixed; inset: 0; background: #0F1D2E;
+  position: fixed; inset: 0; background: #1B2A4A;
   display: flex; align-items: center; justify-content: center;
   z-index: 9999; font-family: system-ui, sans-serif;
 }
 .login-card {
-  background: #162639; border-radius: 16px; padding: 40px 36px;
+  background: #223459; border-radius: 16px; padding: 40px 36px;
   width: 100%; max-width: 380px; box-shadow: 0 24px 48px rgba(0,0,0,0.4);
 }
 .login-logo { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 4px; }
@@ -1683,9 +1686,9 @@ tr:hover td { background: #FAFAFA; }
   background: rgba(255,255,255,0.07); border: 1.5px solid rgba(255,255,255,0.12);
   border-radius: 8px; color: #fff; font-size: 14px; margin-bottom: 16px; outline: none;
 }
-.login-input:focus { border-color: #2563EB; background: rgba(37,99,235,0.08); }
+.login-input:focus { border-color: #2E75B6; background: rgba(37,99,235,0.08); }
 .login-btn {
-  width: 100%; padding: 12px; background: #2563EB; border: none; border-radius: 8px;
+  width: 100%; padding: 12px; background: #2E75B6; border: none; border-radius: 8px;
   color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 4px;
   transition: background 0.15s;
 }
@@ -1714,7 +1717,7 @@ tr:hover td { background: #FAFAFA; }
 
 <!-- FIREBASE LOADING SCREEN -->
 <div id="fb-loading" style="
-  position:fixed;inset:0;background:#0F1D2E;
+  position:fixed;inset:0;background:#1B2A4A;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   z-index:9999;gap:18px;transition:opacity 0.4s;
 ">
@@ -1722,7 +1725,7 @@ tr:hover td { background: #FAFAFA; }
   <div style="color:#fff;font-weight:700;font-size:16px;font-family:system-ui">ESS Consulting AS</div>
   <div style="color:rgba(255,255,255,0.5);font-size:13px;font-family:system-ui" id="fb-loading-msg">Kobler til database…</div>
   <div style="width:200px;height:3px;background:rgba(255,255,255,0.15);border-radius:10px;overflow:hidden;margin-top:8px">
-    <div id="fb-loading-bar" style="height:100%;background:#2563EB;border-radius:10px;width:0%;transition:width 0.6s ease"></div>
+    <div id="fb-loading-bar" style="height:100%;background:#2E75B6;border-radius:10px;width:0%;transition:width 0.6s ease"></div>
   </div>
 </div>
 
@@ -2935,10 +2938,10 @@ function renderFollowup() {
   };
   const typeBg = {
     red:    'background:var(--red-pale);color:#991B1B',
-    yellow: 'background:var(--yellow-pale);color:#78350F',
-    orange: 'background:var(--orange-pale);color:#9A3412',
+    yellow: 'background:var(--yellow-pale);color:#7A3B1E',
+    orange: 'background:var(--orange-pale);color:#7A3B1E',
     blue:   'background:var(--blue-pale);color:#1E40AF',
-    green:  'background:var(--green-pale);color:#065F46',
+    green:  'background:var(--green-pale);color:#0D4A38',
   };
 
   let tableRows = '';
@@ -3029,7 +3032,7 @@ function renderProjectDetail(id) {
             <div class="next-step-label">Klar for milepæl</div>
             <div class="next-step-text">${escHtml(nextMilestone.name)}</div>
           </div>
-          <button class="btn btn-sm" style="background:var(--green-pale);color:#065F46;white-space:nowrap"
+          <button class="btn btn-sm" style="background:var(--green-pale);color:#0D4A38;white-space:nowrap"
             onclick="completeTask('${nextMilestone.id}')">Fullfør milepæl →</button>
         </div>`;
       } else if (nextTask) {
@@ -3052,7 +3055,7 @@ function renderProjectDetail(id) {
           <div class="next-step-label">Alle faser fullført</div>
           <div class="next-step-text">Prosjektet er klart for avslutning</div>
         </div>
-        ${p.status !== 'avsluttet' ? `<button class="btn btn-sm" style="background:var(--green-pale);color:#065F46" onclick="closeProject('${p.id}')">Avslutt prosjekt</button>` : ''}
+        ${p.status !== 'avsluttet' ? `<button class="btn btn-sm" style="background:var(--green-pale);color:#0D4A38" onclick="closeProject('${p.id}')">Avslutt prosjekt</button>` : ''}
       </div>`;
     }
   }
@@ -3205,7 +3208,7 @@ function renderProjectDetail(id) {
       <div class="flex gap-8 items-center flex-wrap">
         ${badge(p.status)}
         <button class="btn btn-ghost btn-sm" onclick="openProjectModal('${p.id}')">✏️ Rediger</button>
-        ${p.status !== 'avsluttet' ? `<button class="btn btn-sm" style="background:var(--green-pale);color:#065F46" onclick="closeProject('${p.id}')">✅ Avslutt</button>` : ''}
+        ${p.status !== 'avsluttet' ? `<button class="btn btn-sm" style="background:var(--green-pale);color:#0D4A38" onclick="closeProject('${p.id}')">✅ Avslutt</button>` : ''}
         <button class="btn btn-ghost btn-sm" style="color:var(--blue);border:1.5px solid var(--blue)" onclick="openProjectReport('${p.id}')">📄 Rapport</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--green);border:1.5px solid var(--green)" onclick="generateOppdragsPDF('${p.id}')">📑 Engasjementsbrev</button>
         <button class="btn btn-ghost btn-sm" style="color:#7c3aed;border:1.5px solid #7c3aed" onclick="openTimeoversiktModal('${p.id}')">🧾 Timeoversikt</button>
@@ -3906,7 +3909,7 @@ function renderCalendar() {
             const right = parseFloat(pct(p.endDate)   ?? '100');
             if (right < 0 || left > 100) return '';
             const width = Math.max(0.8, right - left).toFixed(2);
-            const colors = ['var(--blue)','var(--green)','#8b5cf6','#f59e0b','#06b6d4','#ec4899'];
+            const colors = ['var(--blue)','var(--green)','#8b5cf6','#C4793A','#06b6d4','#ec4899'];
             const col    = colors[i % colors.length];
             return `<div style="position:relative;height:28px;margin-bottom:6px"
               onclick="navigate('project-detail',{projectId:'${p.id}'})" title="${escHtml(p.name)}">
@@ -4007,7 +4010,7 @@ function renderOkonomi() {
     let statusDot = '';
     if (avt > 0) {
       if (pct >= 100)      statusDot = `<span title="Fullt fakturert" style="color:var(--green)">●</span>`;
-      else if (pct >= 50)  statusDot = `<span title="${pct}% fakturert" style="color:var(--yellow,#f59e0b)">●</span>`;
+      else if (pct >= 50)  statusDot = `<span title="${pct}% fakturert" style="color:var(--yellow,#C4793A)">●</span>`;
       else                 statusDot = `<span title="${pct}% fakturert" style="color:var(--red)">●</span>`;
     }
 
@@ -4057,7 +4060,7 @@ function renderOkonomi() {
         { label:'Estimert totalt',       val: totEst,  sub: 'alle prosjekter',        color: 'var(--blue)',  drill:'est'  },
         { label:'Avtalt totalt',          val: totAvt,  sub: 'alle prosjekter',        color: 'var(--blue)',  drill:'avt'  },
         { label:'Fakturert totalt',       val: totFakt, sub: 'alle prosjekter',        color: 'var(--green)', drill:'fakt' },
-        { label:'Gjenstår å fakturere',   val: totGjen, sub: 'avtalt minus fakturert', color: totGjen > 0 ? 'var(--yellow,#f59e0b)' : 'var(--green)', drill:'gjen' },
+        { label:'Gjenstår å fakturere',   val: totGjen, sub: 'avtalt minus fakturert', color: totGjen > 0 ? 'var(--yellow,#C4793A)' : 'var(--green)', drill:'gjen' },
       ].map(k => `<div class="card" onclick="showOkonomiDrilldown('${k.drill}')"
           style="padding:16px 18px;cursor:pointer;transition:box-shadow 0.15s"
           onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.10)'"
@@ -8613,7 +8616,7 @@ function _renderTimeoversiktModal(p, c) {
       ${honorar ? `<button class="btn btn-secondary btn-sm" onclick="_fordeltimer('${p.id}')">↺ Fordel timer på nytt</button>` : ''}
     </div>
     ${!p.honorarAvtalt ? `
-    <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+    <div style="background:#fffbeb;border:1px solid #C4793A;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
       <span>⚠️ <strong>Avtalt honorar er ikke registrert.</strong> Timer er estimert av AI — resultat blir mer presist om du setter honorar på prosjektet.</span>
       <button class="btn btn-secondary btn-sm" style="white-space:nowrap" onclick="closeModal();openProjectModal('${p.id}')">Sett honorar</button>
     </div>` : ''}
@@ -8815,14 +8818,14 @@ function openProjectReport(projectId) {
 
   // ── Status label / color ────────────────────────────────────
   const statusMap = {
-    'ikke-startet':     { label: 'Ikke startet',        color: '#6B7280' },
-    'pagar':            { label: 'Pågår',               color: '#2563EB' },
-    'venter-kunde':     { label: 'Venter på kunde',     color: '#F59E0B' },
-    'venter-leveranse': { label: 'Venter på leveranse', color: '#F97316' },
-    'klar-avslutning':  { label: 'Klar for avslutning', color: '#10B981' },
-    'avsluttet':        { label: 'Avsluttet',           color: '#10B981' },
+    'ikke-startet':     { label: 'Ikke startet',        color: '#7A7168' },
+    'pagar':            { label: 'Pågår',               color: '#2E75B6' },
+    'venter-kunde':     { label: 'Venter på kunde',     color: '#C4793A' },
+    'venter-leveranse': { label: 'Venter på leveranse', color: '#C4793A' },
+    'klar-avslutning':  { label: 'Klar for avslutning', color: '#1D6B54' },
+    'avsluttet':        { label: 'Avsluttet',           color: '#1D6B54' },
   };
-  const st = statusMap[p.status] || { label: p.status, color: '#6B7280' };
+  const st = statusMap[p.status] || { label: p.status, color: '#7A7168' };
   const pct = p.progress;
 
   // ── Phase sections ──────────────────────────────────────────
@@ -8839,7 +8842,7 @@ function openProjectReport(projectId) {
 
       const taskRows = regularTasks.map(t => {
         const isDoneT = t.status === 'fullfort';
-        const statusDot = isDoneT ? '#10B981' : t.status === 'pagar' ? '#2563EB' : '#D1D5DB';
+        const statusDot = isDoneT ? '#1D6B54' : t.status === 'pagar' ? '#2E75B6' : '#D1D5DB';
         const completedStr = t.completedAt ? `<span class="task-date">Fullført ${fmtShort(t.completedAt)}</span>` : '';
         const dueStr = t.dueDate && !t.completedAt ? `<span class="task-date">Frist ${fmtShort(t.dueDate)}</span>` : '';
         return `
@@ -8888,7 +8891,7 @@ function openProjectReport(projectId) {
     if (manualTasks.length) {
       const taskRows = manualTasks.map(t => {
         const isDoneT = t.status === 'fullfort';
-        const statusDot = isDoneT ? '#10B981' : t.status === 'pagar' ? '#2563EB' : '#D1D5DB';
+        const statusDot = isDoneT ? '#1D6B54' : t.status === 'pagar' ? '#2E75B6' : '#D1D5DB';
         return `
         <tr class="${isDoneT ? 'done-row' : ''}">
           <td class="task-dot-cell"><span class="dot" style="background:${statusDot}"></span></td>
@@ -8901,7 +8904,7 @@ function openProjectReport(projectId) {
       <div class="phase-block">
         <div class="phase-header">
           <div class="phase-header-left">
-            <span class="phase-number" style="background:#F3F4F6;color:#6B7280">+</span>
+            <span class="phase-number" style="background:#F5F4F0;color:#7A7168">+</span>
             <span class="phase-title">Øvrige oppgaver</span>
           </div>
         </div>
@@ -8913,7 +8916,7 @@ function openProjectReport(projectId) {
     // No template — flat task list
     const rows = allTasks.map(t => {
       const isDoneT = t.status === 'fullfort';
-      const statusDot = isDoneT ? '#10B981' : t.status === 'pagar' ? '#2563EB' : '#D1D5DB';
+      const statusDot = isDoneT ? '#1D6B54' : t.status === 'pagar' ? '#2E75B6' : '#D1D5DB';
       return `
       <tr class="${isDoneT ? 'done-row' : ''}">
         <td class="task-dot-cell"><span class="dot" style="background:${statusDot}"></span></td>
@@ -8973,7 +8976,7 @@ function openProjectReport(projectId) {
   body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     font-size: 13px;
-    color: #111827;
+    color: #1B2A4A;
     background: #fff;
     max-width: 860px;
     margin: 0 auto;
@@ -8986,24 +8989,24 @@ function openProjectReport(projectId) {
     justify-content: space-between;
     align-items: flex-start;
     padding-bottom: 24px;
-    border-bottom: 3px solid #0F1D2E;
+    border-bottom: 3px solid #1B2A4A;
     margin-bottom: 32px;
   }
   .firm-name {
     font-size: 22px;
     font-weight: 800;
-    color: #0F1D2E;
+    color: #1B2A4A;
     letter-spacing: -0.5px;
   }
   .firm-sub {
     font-size: 12px;
-    color: #6B7280;
+    color: #7A7168;
     margin-top: 2px;
   }
   .report-meta {
     text-align: right;
     font-size: 11.5px;
-    color: #6B7280;
+    color: #7A7168;
     line-height: 1.7;
   }
 
@@ -9013,7 +9016,7 @@ function openProjectReport(projectId) {
     grid-template-columns: 1fr auto;
     gap: 24px;
     background: #F8FAFC;
-    border: 1px solid #E5E7EB;
+    border: 1px solid #E0DDD6;
     border-radius: 10px;
     padding: 24px 28px;
     margin-bottom: 32px;
@@ -9022,13 +9025,13 @@ function openProjectReport(projectId) {
   .project-title {
     font-size: 20px;
     font-weight: 800;
-    color: #111827;
+    color: #1B2A4A;
     margin-bottom: 4px;
     line-height: 1.3;
   }
   .project-client {
     font-size: 13px;
-    color: #6B7280;
+    color: #7A7168;
     margin-bottom: 16px;
   }
   .project-meta-grid {
@@ -9048,7 +9051,7 @@ function openProjectReport(projectId) {
   .meta-field p {
     font-size: 13px;
     font-weight: 600;
-    color: #111827;
+    color: #1B2A4A;
   }
   .status-pill {
     display: inline-block;
@@ -9068,24 +9071,24 @@ function openProjectReport(projectId) {
   .progress-track {
     flex: 1;
     height: 8px;
-    background: #E5E7EB;
+    background: #E0DDD6;
     border-radius: 10px;
     overflow: hidden;
   }
   .progress-fill {
     height: 100%;
     border-radius: 10px;
-    background: #2563EB;
+    background: #2E75B6;
     transition: width 0.4s;
   }
-  .progress-fill.green { background: #10B981; }
+  .progress-fill.green { background: #1D6B54; }
   .progress-fill.red   { background: #EF4444; }
   .progress-pct {
     font-size: 13px;
     font-weight: 700;
     min-width: 36px;
     text-align: right;
-    color: #2563EB;
+    color: #2E75B6;
   }
 
   /* ---- STATS ROW ---- */
@@ -9097,7 +9100,7 @@ function openProjectReport(projectId) {
   }
   .stat-card {
     background: #F8FAFC;
-    border: 1px solid #E5E7EB;
+    border: 1px solid #E0DDD6;
     border-radius: 8px;
     padding: 14px 16px;
     text-align: center;
@@ -9105,13 +9108,13 @@ function openProjectReport(projectId) {
   .stat-card .val {
     font-size: 26px;
     font-weight: 800;
-    color: #111827;
+    color: #1B2A4A;
     line-height: 1;
     margin-bottom: 4px;
   }
   .stat-card .lbl {
     font-size: 11px;
-    color: #6B7280;
+    color: #7A7168;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -9124,16 +9127,16 @@ function openProjectReport(projectId) {
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: #0F1D2E;
+    color: #1B2A4A;
     margin-bottom: 16px;
     padding-bottom: 8px;
-    border-bottom: 2px solid #E5E7EB;
+    border-bottom: 2px solid #E0DDD6;
   }
 
   /* ---- PHASES ---- */
   .phase-block {
     margin-bottom: 20px;
-    border: 1px solid #E5E7EB;
+    border: 1px solid #E0DDD6;
     border-radius: 8px;
     overflow: hidden;
   }
@@ -9143,7 +9146,7 @@ function openProjectReport(projectId) {
     justify-content: space-between;
     padding: 10px 14px;
     background: #F8FAFC;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid #E0DDD6;
   }
   .phase-header-left { display: flex; align-items: center; gap: 10px; }
   .phase-number {
@@ -9151,19 +9154,19 @@ function openProjectReport(projectId) {
     border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 11px; font-weight: 800;
-    background: #E5E7EB; color: #6B7280;
+    background: #E0DDD6; color: #7A7168;
     flex-shrink: 0;
   }
-  .phase-number.done { background: #10B981; color: #fff; }
-  .phase-title { font-size: 13px; font-weight: 700; color: #111827; }
-  .phase-count { font-size: 11.5px; color: #6B7280; font-weight: 600; }
+  .phase-number.done { background: #1D6B54; color: #fff; }
+  .phase-title { font-size: 13px; font-weight: 700; color: #1B2A4A; }
+  .phase-count { font-size: 11.5px; color: #7A7168; font-weight: 600; }
   .phase-done .phase-header { background: #F0FDF4; }
   .phase-done .phase-header { border-color: #D1FAE5; }
 
   /* ---- TASK TABLE ---- */
   .task-table { width: 100%; border-collapse: collapse; }
   .task-table td { padding: 8px 14px; vertical-align: middle; }
-  .task-table tr { border-bottom: 1px solid #F3F4F6; }
+  .task-table tr { border-bottom: 1px solid #F5F4F0; }
   .task-table tr:last-child { border-bottom: none; }
   .task-table tr.done-row { opacity: 0.7; }
   .task-dot-cell { width: 20px; padding-right: 4px; }
@@ -9172,16 +9175,16 @@ function openProjectReport(projectId) {
     width: 8px; height: 8px;
     border-radius: 50%;
   }
-  .task-name-cell { font-size: 12.5px; font-weight: 500; color: #111827; }
-  .done-row .task-name-cell { text-decoration: line-through; color: #6B7280; }
+  .task-name-cell { font-size: 12.5px; font-weight: 500; color: #1B2A4A; }
+  .done-row .task-name-cell { text-decoration: line-through; color: #7A7168; }
   .task-meta-cell { width: 140px; }
   .task-date-cell { width: 160px; text-align: right; }
-  .task-date { font-size: 11.5px; color: #6B7280; }
+  .task-date { font-size: 11.5px; color: #7A7168; }
   .meta-chip {
     display: inline-block;
     font-size: 11px;
-    background: #F3F4F6;
-    color: #6B7280;
+    background: #F5F4F0;
+    color: #7A7168;
     border-radius: 4px;
     padding: 1px 6px;
   }
@@ -9194,18 +9197,18 @@ function openProjectReport(projectId) {
     padding: 10px 14px;
     font-size: 12.5px;
     font-weight: 700;
-    background: #EFF6FF;
+    background: #E6F1FB;
     border-top: 1px solid #DBEAFE;
   }
   .milestone-done { background: #F0FDF4; border-top-color: #D1FAE5; }
-  .milestone-pending { background: #FFFBEB; border-top-color: #FDE68A; }
+  .milestone-pending { background: #FDF6ED; border-top-color: #FDE68A; }
   .milestone-flag { font-size: 15px; }
   .milestone-name { flex: 1; }
-  .milestone-date { font-size: 11.5px; font-weight: 600; color: #6B7280; }
+  .milestone-date { font-size: 11.5px; font-weight: 600; color: #7A7168; }
   .milestone-pending-label {
     font-size: 11px; font-weight: 700;
-    color: #F59E0B;
-    background: #FFFBEB;
+    color: #C4793A;
+    background: #FDF6ED;
     border: 1px solid #FDE68A;
     border-radius: 4px;
     padding: 1px 6px;
@@ -9222,7 +9225,7 @@ function openProjectReport(projectId) {
     left: 107px;
     top: 0; bottom: 0;
     width: 2px;
-    background: #E5E7EB;
+    background: #E0DDD6;
   }
   .tl-item {
     position: relative;
@@ -9237,7 +9240,7 @@ function openProjectReport(projectId) {
     width: 110px;
     text-align: right;
     font-size: 11.5px;
-    color: #6B7280;
+    color: #7A7168;
     font-weight: 600;
     padding-top: 1px;
   }
@@ -9247,36 +9250,36 @@ function openProjectReport(projectId) {
     top: 4px;
     width: 12px; height: 12px;
     border-radius: 50%;
-    background: #2563EB;
+    background: #2E75B6;
     border: 2px solid #fff;
     box-shadow: 0 0 0 2px #BFDBFE;
     flex-shrink: 0;
   }
   .tl-dot-milestone {
-    background: #10B981;
+    background: #1D6B54;
     box-shadow: 0 0 0 2px #A7F3D0;
     width: 14px; height: 14px;
     left: -6px; top: 3px;
   }
   .tl-body { font-size: 12.5px; line-height: 1.5; }
-  .tl-name { font-weight: 600; color: #111827; }
-  .tl-assignee { color: #6B7280; }
+  .tl-name { font-weight: 600; color: #1B2A4A; }
+  .tl-assignee { color: #7A7168; }
   .tl-phase { color: #9CA3AF; font-style: italic; }
   .tl-milestone-chip {
     display: inline-block;
     font-size: 10px; font-weight: 700;
-    background: #ECFDF5; color: #10B981;
+    background: #E1F5EE; color: #1D6B54;
     border-radius: 4px; padding: 1px 6px; margin-right: 5px;
     text-transform: uppercase; letter-spacing: 0.04em;
     vertical-align: middle;
   }
-  .tl-item.tl-milestone .tl-name { color: #065F46; }
+  .tl-item.tl-milestone .tl-name { color: #0D4A38; }
 
   /* ---- PRINT BUTTON ---- */
   .print-bar {
     position: fixed;
     top: 0; left: 0; right: 0;
-    background: #0F1D2E;
+    background: #1B2A4A;
     color: #fff;
     display: flex;
     align-items: center;
@@ -9298,7 +9301,7 @@ function openProjectReport(projectId) {
     margin-left: 10px;
   }
   .print-bar .print-btn {
-    background: #2563EB;
+    background: #2E75B6;
     border: none;
     color: #fff;
     border-radius: 6px;
@@ -9371,11 +9374,11 @@ function openProjectReport(projectId) {
     <div class="lbl">Oppgaver totalt</div>
   </div>
   <div class="stat-card">
-    <div class="val" style="color:#10B981">${doneT}</div>
+    <div class="val" style="color:#1D6B54">${doneT}</div>
     <div class="lbl">Fullført</div>
   </div>
   <div class="stat-card">
-    <div class="val" style="color:${openT > 0 ? '#F59E0B' : '#10B981'}">${openT}</div>
+    <div class="val" style="color:${openT > 0 ? '#C4793A' : '#1D6B54'}">${openT}</div>
     <div class="lbl">Gjenstår</div>
   </div>
   <div class="stat-card">
@@ -9393,7 +9396,7 @@ function openProjectReport(projectId) {
 ${timelineHtml}
 
 <!-- FOOTER -->
-<div style="margin-top:48px;padding-top:16px;border-top:1px solid #E5E7EB;font-size:11px;color:#9CA3AF;display:flex;justify-content:space-between">
+<div style="margin-top:48px;padding-top:16px;border-top:1px solid #E0DDD6;font-size:11px;color:#9CA3AF;display:flex;justify-content:space-between">
   <span>ESS Consulting AS · Konfidensielt dokument</span>
   <span>Generert ${today}</span>
 </div>
