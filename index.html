@@ -3365,12 +3365,17 @@ function renderProjectDetail(id) {
       </div>
     </div>
     <div class="card-body" id="doc-list-${p.id}">
+      <div id="doc-drop-${p.id}"
+        ondragover="docDragOver(event,'${p.id}')"
+        ondragleave="docDragLeave(event,'${p.id}')"
+        ondrop="docDrop(event,'${p.id}')"
+        style="border:2px dashed transparent;border-radius:8px;transition:border-color .15s,background .15s;min-height:8px">
       ${(() => {
         const projDocs = DB.documents.filter(d => d.projectId === p.id)
           .sort((a,b) => b.createdAt.localeCompare(a.createdAt));
         if (!projDocs.length) return `
-          <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">
-            Ingen dokumenter lastet opp ennå.<br>
+          <div style="text-align:center;padding:28px 20px;color:var(--text-muted);font-size:13px">
+            Dra filer hit, eller bruk <strong>⬆️ Last opp</strong>-knappen.<br>
             <span style="font-size:12px">PDF, TXT, MD, DOCX og CSV støttes.</span>
           </div>`;
         return projDocs.map(doc => `
@@ -3386,6 +3391,7 @@ function renderProjectDetail(id) {
               onclick="deleteDoc('${doc.id}','${p.id}')">🗑️</button>
           </div>`).join('');
       })()}
+      </div>
     </div>
   </div>
 
@@ -7680,23 +7686,45 @@ function _docIcon(type) {
   return '📄';
 }
 
+function docDragOver(event, projectId) {
+  event.preventDefault();
+  const zone = document.getElementById('doc-drop-' + projectId);
+  if (zone) { zone.style.borderColor = 'var(--blue)'; zone.style.background = 'rgba(59,130,246,.05)'; }
+}
+function docDragLeave(event, projectId) {
+  if (event.currentTarget.contains(event.relatedTarget)) return;
+  const zone = document.getElementById('doc-drop-' + projectId);
+  if (zone) { zone.style.borderColor = 'transparent'; zone.style.background = ''; }
+}
+function docDrop(event, projectId) {
+  event.preventDefault();
+  const zone = document.getElementById('doc-drop-' + projectId);
+  if (zone) { zone.style.borderColor = 'transparent'; zone.style.background = ''; }
+  const files = Array.from(event.dataTransfer.files);
+  if (!files.length) return;
+  _processDocFiles(files, projectId);
+}
+
 async function handleDocUpload(event, projectId) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
+  await _processDocFiles(files, projectId);
+  event.target.value = '';
+}
 
+async function _processDocFiles(files, projectId) {
   for (const file of files) {
     showToast(`Leser ${file.name}…`, 'info');
     try {
       const text = await _extractText(file);
-      const docText = text.slice(0, 80000); // maks ~80k tegn per dokument
-      // Sjekk samlet tekst-budsjett før vi legger til
+      const docText = text.slice(0, 80000);
       if (_documentsTextSize() + docText.length > DOCUMENTS_TEXT_CAP) {
         const usedKb = Math.round(_documentsTextSize() / 1024);
         const capKb  = Math.round(DOCUMENTS_TEXT_CAP / 1024);
         showToast(`Ikke plass til «${file.name}» (${usedKb}/${capKb} KB brukt). Slett gamle dokumenter først.`, 'error');
         continue;
       }
-      const doc = {
+      DB.documents.push({
         id:        uid(),
         projectId,
         name:      file.name,
@@ -7704,16 +7732,13 @@ async function handleDocUpload(event, projectId) {
         chars:     text.length,
         text:      docText,
         createdAt: now(),
-      };
-      DB.documents.push(doc);
+      });
       logActivity('notat', projectId, `Dokument lastet opp: ${file.name}`);
       persistAll({toast: `«${file.name}» lastet opp ✓`});
     } catch (err) {
       showToast(`Kunne ikke lese ${file.name}: ${err.message}`, 'error');
     }
   }
-  // Reset input så samme fil kan lastes opp igjen
-  event.target.value = '';
   render();
 }
 
