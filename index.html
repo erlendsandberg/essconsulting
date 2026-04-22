@@ -8457,126 +8457,159 @@ function loadDemoData() {
    TIMEOVERSIKT — modal + PDF-generator
    ============================================================ */
 let _timeoversiktLines = [];
+let _timeoversiktProjId = null;
 
 function openTimeoversiktModal(projectId) {
   const p = DB.projects.find(x => x.id === projectId);
   if (!p) return;
   const c = DB.customers.find(x => x.id === p.customerId);
   const ts = p.timesats || 2600;
+  _timeoversiktProjId = projectId;
 
-  // Pre-fyll fra fullførte oppgaver, sorter etter completedAt/dueDate
   const tasks = DB.tasks
     .filter(t => t.projectId === projectId)
     .sort((a, b) => (a.completedAt || a.dueDate || '').localeCompare(b.completedAt || b.dueDate || ''));
 
+  // Fordel timer basert på honorarAvtalt / timesats, jevnt på antall oppgaver
+  const honorar = p.honorarAvtalt || 0;
+  const totalHours = honorar > 0 ? honorar / ts : 0;
+  const n = tasks.length || 1;
+  const hoursEach = totalHours > 0
+    ? (i) => Math.round((totalHours / n) * 2) / 2  // nærmeste 0,5
+    : () => '';
+
   _timeoversiktLines = tasks.length
-    ? tasks.map(t => ({
+    ? tasks.map((t, i) => ({
         aktivitet: t.name,
         periode:   _taskPeriode(t),
-        timer:     '',
+        timer:     hoursEach(i),
         timesats:  ts,
       }))
     : [{ aktivitet: '', periode: '', timer: '', timesats: ts }];
 
-  _renderTimeoversiktModal(projectId, p, c);
+  _renderTimeoversiktModal(p, c);
 }
 
 function _taskPeriode(t) {
   const d = t.completedAt || t.dueDate || '';
   if (!d) return '';
   const dt = new Date(d);
-  return dt.toLocaleDateString('nb-NO', { month: 'short', year: 'numeric' })
-    .replace('.', '').replace(' ', ' ');
+  return dt.toLocaleDateString('nb-NO', { month: 'short', year: 'numeric' }).replace('.', '');
 }
 
-function _renderTimeoversiktModal(projectId, p, c) {
+function _renderTimeoversiktModal(p, c) {
   const ts = p.timesats || 2600;
-  document.getElementById('modal').style.maxWidth = '780px';
-  document.getElementById('modalTitle').textContent = '🧾 Timeoversikt';
+  const honorar = p.honorarAvtalt || 0;
 
   const rowsHtml = _timeoversiktLines.map((l, i) => `
     <tr>
-      <td><input class="form-control" style="font-size:12px;padding:4px 6px" value="${escHtml(l.aktivitet)}"
+      <td style="padding:3px 4px"><input class="form-control" style="font-size:12px;padding:3px 6px" value="${escHtml(l.aktivitet)}"
         oninput="_toLine(${i},'aktivitet',this.value)" placeholder="Aktivitetsbeskrivelse"></td>
-      <td><input class="form-control" style="font-size:12px;padding:4px 6px;width:110px" value="${escHtml(l.periode)}"
+      <td style="padding:3px 4px"><input class="form-control" style="font-size:12px;padding:3px 6px;width:100px" value="${escHtml(String(l.periode||''))}"
         oninput="_toLine(${i},'periode',this.value)" placeholder="Feb 2026"></td>
-      <td><input class="form-control" style="font-size:12px;padding:4px 6px;width:72px;text-align:right" type="number" min="0" step="0.5"
+      <td style="padding:3px 4px"><input class="form-control" style="font-size:12px;padding:3px 6px;width:68px;text-align:right" type="number" min="0" step="0.5"
         value="${l.timer}" oninput="_toLine(${i},'timer',this.value)" placeholder="0,0"></td>
-      <td><input class="form-control" style="font-size:12px;padding:4px 6px;width:88px;text-align:right" type="number" min="0" step="100"
+      <td style="padding:3px 4px"><input class="form-control" style="font-size:12px;padding:3px 6px;width:82px;text-align:right" type="number" min="0" step="100"
         value="${l.timesats}" oninput="_toLine(${i},'timesats',this.value)"></td>
-      <td style="text-align:right;font-size:12px;padding:4px 8px;white-space:nowrap">
-        ${l.timer ? (Number(l.timer) * Number(l.timesats)).toLocaleString('nb-NO') : '—'}
+      <td style="text-align:right;font-size:12px;padding:3px 8px;white-space:nowrap;min-width:70px">
+        ${l.timer ? (Number(l.timer)*Number(l.timesats)).toLocaleString('nb-NO') : '—'}
       </td>
-      <td><button class="btn btn-ghost btn-sm" style="color:var(--red);padding:2px 6px" onclick="_removeTimeoversiktLine(${i})">✕</button></td>
+      <td style="padding:3px 2px"><button class="btn btn-ghost btn-sm" style="color:var(--red);padding:2px 6px" onclick="_removeTimeoversiktLine(${i})">✕</button></td>
     </tr>`).join('');
 
   const sumTimer = _timeoversiktLines.reduce((s, l) => s + (Number(l.timer) || 0), 0);
-  const sumBelop = _timeoversiktLines.reduce((s, l) => s + (Number(l.timer) || 0) * (Number(l.timesats) || 0), 0);
-  const mva = Math.round(sumBelop * 0.25);
-  const total = sumBelop + mva;
+  const sumBelop = _timeoversiktLines.reduce((s, l) => s + (Number(l.timer)||0) * (Number(l.timesats)||0), 0);
+  const mva      = Math.round(sumBelop * 0.25);
+  const total    = sumBelop + mva;
+  const diff     = honorar > 0 ? (honorar - sumBelop) : null;
+  const diffHtml = diff !== null ? `
+    <div style="margin-top:6px;font-size:12px;color:${Math.abs(diff)<1?'var(--green)':diff>0?'var(--red)':'var(--text-muted)'}">
+      ${diff === 0 ? '✓ Timer stemmer med avtalt honorar' : diff > 0
+        ? `Timer underdekkende med NOK ${diff.toLocaleString('nb-NO')} (${(diff/ts).toFixed(1)} t mangler)`
+        : `Timer overdekkende med NOK ${Math.abs(diff).toLocaleString('nb-NO')} (${(Math.abs(diff)/ts).toFixed(1)} t for mye)`}
+    </div>` : '';
 
+  document.getElementById('modal').style.maxWidth = '800px';
+  document.getElementById('modalTitle').textContent = '🧾 Timeoversikt';
   document.getElementById('modalBody').innerHTML = `
-    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
-      <strong>${escHtml(c?.name || '')}</strong> — ${escHtml(p.name)}
-      &nbsp;·&nbsp; Timesats NOK ${ts.toLocaleString('nb-NO')} + MVA
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:12px;color:var(--text-muted)">
+        <strong>${escHtml(c?.name||'')}</strong> — ${escHtml(p.name)}
+        &nbsp;·&nbsp; Timesats NOK ${ts.toLocaleString('nb-NO')} + MVA
+        ${honorar ? `&nbsp;·&nbsp; Avtalt honorar NOK ${honorar.toLocaleString('nb-NO')}` : ''}
+      </div>
+      ${honorar ? `<button class="btn btn-secondary btn-sm" onclick="_fordeltimer('${p.id}')">↺ Fordel timer på nytt</button>` : ''}
     </div>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse">
       <thead>
         <tr style="border-bottom:2px solid var(--border);font-size:11px;color:var(--text-muted)">
-          <th style="text-align:left;padding:4px 6px">Aktivitet</th>
-          <th style="text-align:left;padding:4px 6px">Periode</th>
-          <th style="text-align:right;padding:4px 6px">Timer</th>
-          <th style="text-align:right;padding:4px 6px">Sats</th>
+          <th style="text-align:left;padding:4px 4px">Aktivitet</th>
+          <th style="text-align:left;padding:4px 4px">Periode</th>
+          <th style="text-align:right;padding:4px 4px">Timer</th>
+          <th style="text-align:right;padding:4px 4px">Sats</th>
           <th style="text-align:right;padding:4px 8px">Beløp</th>
           <th></th>
         </tr>
       </thead>
       <tbody>${rowsHtml}</tbody>
     </table>
-    <button class="btn btn-ghost btn-sm" style="font-size:12px;margin-bottom:16px"
-      onclick="_addTimeoversiktLine(${p.timesats||2600})">+ Legg til linje</button>
-    <div style="border-top:2px solid var(--border);padding-top:10px;font-size:13px">
-      <div style="display:flex;justify-content:space-between;padding:3px 8px">
+    </div>
+    <button class="btn btn-ghost btn-sm" style="font-size:12px;margin-top:8px"
+      onclick="_addTimeoversiktLine(${ts})">+ Legg til linje</button>
+    <div style="border-top:2px solid var(--border);margin-top:12px;padding-top:10px;font-size:13px">
+      <div style="display:flex;justify-content:space-between;padding:3px 8px;font-weight:600">
         <span>Sum timer / beløp ex. MVA</span>
-        <span><strong>${sumTimer.toLocaleString('nb-NO', {minimumFractionDigits:1,maximumFractionDigits:1})}</strong>
+        <span>${sumTimer.toLocaleString('nb-NO',{minimumFractionDigits:1,maximumFractionDigits:1})} t
           &nbsp;&nbsp; NOK ${sumBelop.toLocaleString('nb-NO')}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:3px 8px;color:var(--text-muted)">
         <span>MVA (25 %)</span><span>NOK ${mva.toLocaleString('nb-NO')}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;padding:3px 8px;font-weight:700">
+      <div style="display:flex;justify-content:space-between;padding:3px 8px;font-weight:700;font-size:14px">
         <span>Totalt inkl. MVA</span><span>NOK ${total.toLocaleString('nb-NO')}</span>
       </div>
+      ${diffHtml}
     </div>
-    <div style="margin-top:12px;font-size:11px;color:var(--text-muted)">
+    <div style="margin-top:16px;font-size:11px;color:var(--text-muted)">
       <em>Merknad: Timer er avrundet til nærmeste halve time.</em>
+    </div>
+    <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn btn-secondary" onclick="closeModal()">Avbryt</button>
+      <button class="btn btn-primary" style="background:#7c3aed;border-color:#7c3aed"
+        onclick="_exportTimeoversiktPdf('${p.id}')">⬇ Last ned PDF</button>
     </div>`;
-
-  document.getElementById('modalFooter').innerHTML = `
-    <button class="btn btn-secondary" onclick="closeModal()">Avbryt</button>
-    <button class="btn btn-primary" style="background:#7c3aed;border-color:#7c3aed"
-      onclick="_exportTimeoversiktPdf('${p.id}')">⬇ Last ned PDF</button>`;
   openModal();
+}
+
+function _fordeltimer(projectId) {
+  const p = DB.projects.find(x => x.id === projectId);
+  if (!p || !p.honorarAvtalt) return;
+  const ts = p.timesats || 2600;
+  const n = _timeoversiktLines.length || 1;
+  const total = p.honorarAvtalt / ts;
+  _timeoversiktLines.forEach(l => { l.timer = Math.round((total / n) * 2) / 2; });
+  const c = DB.customers.find(x => x.id === p.customerId);
+  _renderTimeoversiktModal(p, c);
 }
 
 function _toLine(i, field, val) {
   _timeoversiktLines[i][field] = val;
-  // Oppdater beløp-kolonnen live uten full re-render
-  const p = DB.projects.find(x => x.id === APP.projectDetailId);
+  const p = DB.projects.find(x => x.id === _timeoversiktProjId);
   const c = p ? DB.customers.find(x => x.id === p.customerId) : null;
-  if (p) _renderTimeoversiktModal(APP.projectDetailId, p, c);
+  if (p) _renderTimeoversiktModal(p, c);
 }
 function _addTimeoversiktLine(ts) {
   _timeoversiktLines.push({ aktivitet: '', periode: '', timer: '', timesats: ts });
-  const p = DB.projects.find(x => x.id === APP.projectDetailId);
+  const p = DB.projects.find(x => x.id === _timeoversiktProjId);
   const c = p ? DB.customers.find(x => x.id === p.customerId) : null;
-  if (p) _renderTimeoversiktModal(APP.projectDetailId, p, c);
+  if (p) _renderTimeoversiktModal(p, c);
 }
 function _removeTimeoversiktLine(i) {
   _timeoversiktLines.splice(i, 1);
-  const p = DB.projects.find(x => x.id === APP.projectDetailId);
+  const p = DB.projects.find(x => x.id === _timeoversiktProjId);
   const c = p ? DB.customers.find(x => x.id === p.customerId) : null;
-  if (p) _renderTimeoversiktModal(APP.projectDetailId, p, c);
+  if (p) _renderTimeoversiktModal(p, c);
 }
 
 function _exportTimeoversiktPdf(projectId) {
