@@ -8522,7 +8522,9 @@ ${docs || '(ingen)'}
 NOTATER/AKTIVITET:
 ${(notes || log || '(ingen)')}
 
-Lag et realistisk timeoversiktsforslag for fakturavedlegg. Grupper gjerne relaterte oppgaver i meningsfulle aktivitetslinjer (5–12 linjer totalt). Timene skal summere til nøyaktig ${totalHours} t.
+${totalHours > 0
+  ? `Lag et realistisk timeoversiktsforslag for fakturavedlegg. Grupper gjerne relaterte oppgaver i meningsfulle aktivitetslinjer (5–12 linjer totalt). Timene skal summere til nøyaktig ${totalHours} t.`
+  : `Lag et realistisk timeoversiktsforslag for fakturavedlegg basert på hva som faktisk er levert. Estimer timene per aktivitet selv ut fra arbeidets kompleksitet og omfang (typisk M&A-oppdrag: 10–25 t totalt). Grupper i 5–12 meningsfulle aktivitetslinjer.`}
 
 Svar KUN med et JSON-array — ingen forklaring, ingen markdown, kun JSON:
 [{"aktivitet":"...","periode":"...","timer":X.X}, ...]
