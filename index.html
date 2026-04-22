@@ -8481,7 +8481,7 @@ function openTimeoversiktModal(projectId) {
 
 async function _aiTimeoversiktForslag(p, c) {
   const ts = p.timesats || 2600;
-  const honorar = p.honorarAvtalt || 0;
+  const honorar = p.honorarAvtalt || p.honorarEstimert || 0;
   const totalHours = honorar > 0 ? Math.round((honorar / ts) * 2) / 2 : 0;
 
   const tasks = DB.tasks
