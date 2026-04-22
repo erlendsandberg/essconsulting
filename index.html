@@ -1814,7 +1814,7 @@ tr:hover td { background: #FAFAFA; }
       <button id="hamburger" onclick="toggleSidebar()">☰</button>
       <div class="page-title" id="pageTitle">Dashboard</div>
       <button class="btn btn-ghost btn-sm" onclick="openCustomerModal(null)">+ Ny kunde</button>
-      <button class="btn btn-ghost btn-sm" onclick="openQuickEstimateModal()" title="Rask prisestimering">🤖 Prisestimat</button>
+      <button class="btn btn-ghost btn-sm" onclick="openQuickEstimateModal()" title="Rask prisestimering">${_ICON_AI} Prisestimat</button>
       <button class="btn btn-primary btn-sm" onclick="openProjectModal(null)">+ Nytt prosjekt</button>
     </header>
     <main id="content">
@@ -1824,6 +1824,10 @@ tr:hover td { background: #FAFAFA; }
 </div>
 
 <script>
+/* Heroicons outline — standard ikonformat på tvers av alle prosjekter */
+const _ICON_AI = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" style="width:15px;height:15px;vertical-align:-3px"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>`;
+const _ICON_AI_LG = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:40px;height:40px;color:#7c3aed"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>`;
+
 /* ============================================================
    GLOBAL STATE
    ============================================================ */
@@ -3317,7 +3321,7 @@ function renderProjectDetail(id) {
   <!-- AI PRISESTIMERING -->
   <div class="card mb-16">
     <div class="card-header">
-      <div class="card-title">🤖 Prisestimering</div>
+      <div class="card-title">${_ICON_AI} Prisestimering</div>
       <span style="font-size:11px;color:var(--text-muted)">Basert på estimert, avtalt og fakturert fra dine prosjekter</span>
     </div>
     <div class="card-body">
@@ -3328,7 +3332,7 @@ function renderProjectDetail(id) {
           style="font-size:13px">${escHtml(p.description||'')}</textarea>
       </div>
       <button class="btn btn-primary btn-sm" id="ai-est-btn-${p.id}"
-        onclick="generateProjectEstimate('${p.id}')">🤖 Generer prisestimat</button>
+        onclick="generateProjectEstimate('${p.id}')">${_ICON_AI} Generer prisestimat</button>
       <div id="ai-est-result-${p.id}" style="display:none;margin-top:12px;background:var(--navy-light);border-radius:8px;padding:14px;color:#fff;font-size:13px;line-height:1.7;white-space:pre-wrap"></div>
 
       ${(p.aiEstimates && p.aiEstimates.length > 0) ? `
@@ -3387,7 +3391,7 @@ function renderProjectDetail(id) {
               <div style="font-size:11px;color:var(--text-muted)">${fmtDate(doc.createdAt.slice(0,10))} · ${doc.chars ? Math.round(doc.chars/1000)+'k tegn' : 'ingen tekst'}</div>
             </div>
             <button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--blue)"
-              onclick="aiSummarizeDoc('${doc.id}','${p.id}')">🤖 Sammendrag</button>
+              onclick="aiSummarizeDoc('${doc.id}','${p.id}')">${_ICON_AI} Sammendrag</button>
             <button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--red)"
               onclick="deleteDoc('${doc.id}','${p.id}')">🗑️</button>
           </div>`).join('');
@@ -4282,7 +4286,7 @@ function renderHonorar() {
     </tr>`).join('');
 
   return `<div class="mb-24">
-    <h2 style="font-size:20px;font-weight:700;margin-bottom:4px">🤖 Prisestimering</h2>
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px">${_ICON_AI} Prisestimering</h2>
     <p class="text-muted text-sm" style="margin-bottom:20px">Få et AI-basert honorarestimat for et nytt oppdrag. Estimatet kalibreres mot din egen faktureringshistorikk.</p>
 
     <div class="card mb-16">
@@ -4307,7 +4311,7 @@ function renderHonorar() {
           <textarea class="form-control" id="he-desc" rows="3"
             placeholder="Beskriv hva oppdraget gjelder, hvem kunden er, og eventuelle særtrekk..."></textarea>
         </div>
-        <button class="btn btn-primary" onclick="runHonorarEstimate()">🤖 Generer prisestimat</button>
+        <button class="btn btn-primary" onclick="runHonorarEstimate()">${_ICON_AI} Generer prisestimat</button>
       </div>
     </div>
 
@@ -4424,7 +4428,7 @@ Vær konkret og praktisk. Vi er ikke McKinsey — estimer realistisk for et nors
   } catch(err) {
     showToast('Feil: ' + err.message, 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🤖 Generer prisestimat'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = _ICON_AI + ' Generer prisestimat'; }
   }
 }
 
@@ -4472,7 +4476,7 @@ Vær konkret og realistisk for norsk SMB-rådgivningsmarked.`;
 
   try {
     const text = await callAI(prompt, 400);
-    if (box) box.innerHTML = `<strong>🤖 ${isUpdate ? 'Oppdatert AI-estimat' : 'AI-estimat'}:</strong><br>${(text||'–').replace(/\n/g,'<br>')}`;
+    if (box) box.innerHTML = `<strong>${_ICON_AI} ${isUpdate ? 'Oppdatert AI-estimat' : 'AI-estimat'}:</strong><br>${(text||'–').replace(/\n/g,'<br>')}`;
   } catch(err) {
     if (box) box.innerHTML = `<span style="color:var(--red)">⚠️ ${err.message}</span>`;
   }
@@ -4562,7 +4566,7 @@ Vær konkret og realistisk for norsk SMB-rådgivningsmarked. Ikke McKinsey-nivå
     if (resEl) { resEl.textContent = '⚠️ ' + err.message; }
     showToast('Feil ved AI-estimering: ' + err.message, 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🤖 Generer prisestimat'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = _ICON_AI + ' Generer prisestimat'; }
   }
 }
 
@@ -4696,7 +4700,7 @@ function openQuickEstimateModal() {
     `<option value="${t.key}">${t.icon} ${t.label}</option>`
   ).join('');
 
-  document.getElementById('modalTitle').textContent = '🤖 Rask prisestimering';
+  document.getElementById('modalTitle').innerHTML = _ICON_AI + ' Rask prisestimering';
   document.getElementById('modalBody').innerHTML = `
     <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
       Estimatet bruker din faktureringshistorikk som referanse, men lagres ikke.
@@ -4746,7 +4750,7 @@ function openQuickEstimateModal() {
     <div id="qe-result" style="display:none;margin:14px 0;background:var(--navy-light);border-radius:8px;padding:14px;color:#fff;font-size:13px;line-height:1.7;white-space:pre-wrap"></div>
     <div class="form-actions" style="margin-top:8px" id="qe-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Lukk</button>
-      <button class="btn btn-primary" id="qe-btn" onclick="runQuickEstimate()">🤖 Generer estimat</button>
+      <button class="btn btn-primary" id="qe-btn" onclick="runQuickEstimate()">${_ICON_AI} Generer estimat</button>
     </div>`;
   openModal();
 }
@@ -4946,7 +4950,7 @@ Vurder kundestørrelse nøye. Prising for 5 MNOK vs 50 MNOK omsetning er vesentl
     if (resEl) resEl.textContent = '⚠️ ' + err.message;
   } finally {
     const btn2 = document.getElementById('qe-btn');
-    if (btn2 && btn2.disabled) { btn2.disabled = false; btn2.textContent = '🤖 Generer estimat'; }
+    if (btn2 && btn2.disabled) { btn2.disabled = false; btn2.innerHTML = _ICON_AI + ' Generer estimat'; }
   }
 }
 
@@ -7869,7 +7873,7 @@ Ikke beskriv dokumenttypen — fokuser på innholdet. Norsk bokmål. Flytende te
     render();
   } catch (err) {
     showToast('Kunne ikke generere sammendrag: ' + err.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '🤖 Sammendrag'; }
+    if (btn) { btn.disabled = false; btn.innerHTML = _ICON_AI + ' Sammendrag'; }
   }
 }
 
@@ -8470,7 +8474,7 @@ function openTimeoversiktModal(projectId) {
   document.getElementById('modalTitle').textContent = '🧾 Timeoversikt';
   document.getElementById('modalBody').innerHTML = `
     <div style="text-align:center;padding:48px 24px;color:var(--text-muted)">
-      <div style="font-size:28px;margin-bottom:12px">🤖</div>
+      <div style="margin-bottom:12px">${_ICON_AI_LG}</div>
       <div style="font-weight:500;margin-bottom:6px">Vera analyserer prosjektet…</div>
       <div style="font-size:12px">Leser oppgaver, dokumenter og aktivitet — foreslår timefordeling.</div>
     </div>`;
