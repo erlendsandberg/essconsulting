@@ -8608,6 +8608,11 @@ function _renderTimeoversiktModal(p, c) {
       </div>
       ${honorar ? `<button class="btn btn-secondary btn-sm" onclick="_fordeltimer('${p.id}')">↺ Fordel timer på nytt</button>` : ''}
     </div>
+    ${!p.honorarAvtalt ? `
+    <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <span>⚠️ <strong>Avtalt honorar er ikke registrert.</strong> Timer er estimert av AI — resultat blir mer presist om du setter honorar på prosjektet.</span>
+      <button class="btn btn-secondary btn-sm" style="white-space:nowrap" onclick="closeModal();openProjectModal('${p.id}')">Sett honorar</button>
+    </div>` : ''}
     <div style="overflow-x:auto">
     <table style="width:100%;border-collapse:collapse">
       <thead>
