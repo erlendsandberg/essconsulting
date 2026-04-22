@@ -6161,10 +6161,11 @@ function renderAnmerkninger() {
   return `
   <div class="page-header">
     <h1>⚠️ Betalingsanmerkninger</h1>
-    <div style="display:flex;gap:8px;align-items:center">
-      <span style="color:var(--text-muted);font-size:13px">${filtered.length} av ${DB.creditAlerts.length} totalt</span>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="color:var(--text-muted);font-size:13px">${filtered.length} av ${DB.creditAlerts.length} totalt${DB.config?.lastIngest ? ` · Sist oppdatert ${fmtDate(DB.config.lastIngest)} kl. ${new Date(DB.config.lastIngest).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'})}` : ''}</span>
       <button class="btn btn-secondary btn-sm" onclick="exportAlertsCsv()">Eksporter CSV</button>
       <button class="btn btn-secondary btn-sm" onclick="exportAlertsPdf()">Eksporter PDF</button>
+      <button class="btn btn-primary btn-sm" onclick="runScraperProtocol()">▶ Kjør scraper</button>
     </div>
   </div>
   <div class="card mb-24">
