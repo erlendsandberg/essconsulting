@@ -8739,19 +8739,20 @@ function _doTimeoversiktPdf(p, c, lines) {
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
   let sumTimer = 0, sumBelop = 0;
   lines.forEach((l, idx) => {
-    if (y > 255) { doc.addPage(); y = 20; }
-    if (idx % 2 === 1) { doc.setFillColor(245, 247, 250); doc.rect(lm, y - 4, cw, 6.5, 'F'); }
-    const timer = Number(l.timer) || 0;
-    const sats  = Number(l.timesats) || ts;
-    const belop = timer * sats;
+    const timer  = Number(l.timer) || 0;
+    const sats   = Number(l.timesats) || ts;
+    const belop  = timer * sats;
     sumTimer += timer; sumBelop += belop;
-    const aktTxt = doc.splitTextToSize(l.aktivitet, 90)[0] || '';
-    doc.text(aktTxt,                                     cols.akt + 1, y);
+    const aktLines = doc.splitTextToSize(l.aktivitet, cols.per - cols.akt - 3);
+    const rowH = Math.max(6.5, aktLines.length * 5);
+    if (y + rowH > 260) { doc.addPage(); y = 20; }
+    if (idx % 2 === 1) { doc.setFillColor(245, 247, 250); doc.rect(lm, y - 4, cw, rowH + 1, 'F'); }
+    doc.text(aktLines,                                   cols.akt + 1, y);
     doc.text(l.periode || '',                            cols.per, y);
     doc.text(timer ? timer.toFixed(1) : '',              cols.tim + 14, y, { align: 'right' });
     doc.text(sats.toLocaleString('nb-NO'),               cols.sats + 16, y, { align: 'right' });
     doc.text(belop ? belop.toLocaleString('nb-NO') : '', cols.belop + 11, y, { align: 'right' });
-    y += 6.5;
+    y += rowH;
   });
 
   // ── Sum-rad ──────────────────────────────────────────────────
