@@ -8463,29 +8463,92 @@ function openTimeoversiktModal(projectId) {
   const p = DB.projects.find(x => x.id === projectId);
   if (!p) return;
   const c = DB.customers.find(x => x.id === p.customerId);
-  const ts = p.timesats || 2600;
   _timeoversiktProjId = projectId;
 
+  // Vis spinner umiddelbart mens AI jobber
+  document.getElementById('modal').style.maxWidth = '800px';
+  document.getElementById('modalTitle').textContent = '🧾 Timeoversikt';
+  document.getElementById('modalBody').innerHTML = `
+    <div style="text-align:center;padding:48px 24px;color:var(--text-muted)">
+      <div style="font-size:28px;margin-bottom:12px">🤖</div>
+      <div style="font-weight:500;margin-bottom:6px">Vera analyserer prosjektet…</div>
+      <div style="font-size:12px">Leser oppgaver, dokumenter og aktivitet — foreslår timefordeling.</div>
+    </div>`;
+  openModal();
+
+  _aiTimeoversiktForslag(p, c);
+}
+
+async function _aiTimeoversiktForslag(p, c) {
+  const ts = p.timesats || 2600;
+  const honorar = p.honorarAvtalt || 0;
+  const totalHours = honorar > 0 ? Math.round((honorar / ts) * 2) / 2 : 0;
+
   const tasks = DB.tasks
-    .filter(t => t.projectId === projectId)
+    .filter(t => t.projectId === p.id)
     .sort((a, b) => (a.completedAt || a.dueDate || '').localeCompare(b.completedAt || b.dueDate || ''));
 
-  // Fordel timer basert på honorarAvtalt / timesats, jevnt på antall oppgaver
-  const honorar = p.honorarAvtalt || 0;
-  const totalHours = honorar > 0 ? honorar / ts : 0;
-  const n = tasks.length || 1;
-  const hoursEach = totalHours > 0
-    ? (i) => Math.round((totalHours / n) * 2) / 2  // nærmeste 0,5
-    : () => '';
+  const notes = DB.notes.filter(n => n.projectId === p.id).map(n => n.text).join('\n').slice(0, 2000);
+  const docs  = DB.documents.filter(d => d.projectId === p.id).map(d => d.name).join(', ');
+  const log   = DB.activityLog.filter(e => e.projectId === p.id)
+    .sort((a,b) => b.ts.localeCompare(a.ts)).slice(0, 30)
+    .map(e => e.tekst).join('\n').slice(0, 1500);
 
-  _timeoversiktLines = tasks.length
-    ? tasks.map((t, i) => ({
-        aktivitet: t.name,
-        periode:   _taskPeriode(t),
-        timer:     hoursEach(i),
-        timesats:  ts,
-      }))
-    : [{ aktivitet: '', periode: '', timer: '', timesats: ts }];
+  const taskList = tasks.map(t => {
+    const dato = t.completedAt || t.dueDate || '';
+    const periode = dato ? new Date(dato).toLocaleDateString('nb-NO', {month:'short',year:'numeric'}).replace('.','') : '';
+    return `- ${t.name}${periode ? ' ('+periode+')' : ''}${t.description ? ': '+t.description.slice(0,100) : ''}`;
+  }).join('\n');
+
+  const prompt = `Du er rådgiver i ESS Consulting AS og skal lage en timeoversikt som fakturavedlegg.
+
+PROSJEKT: ${p.name}
+KUNDE: ${c?.name || ''}
+PROSJEKTTYPE: ${p.projectType || ''}
+BESKRIVELSE: ${p.description || '(ingen)'}
+PERIODE: ${p.startDate||''} – ${p.endDate||''}
+AVTALT HONORAR: NOK ${honorar.toLocaleString('nb-NO')} ex. MVA
+TIMESATS: NOK ${ts.toLocaleString('nb-NO')}/t
+TOTALT ANTALL TIMER Å FORDELE: ${totalHours} t
+
+UTFØRTE OPPGAVER OG LEVERANSER:
+${taskList || '(ingen registrert)'}
+
+UTARBEIDEDE DOKUMENTER: ${docs || '(ingen)'}
+
+NOTATER/AKTIVITET:
+${(notes || log || '(ingen)')}
+
+Lag et realistisk timeoversiktsforslag for fakturavedlegg. Grupper gjerne relaterte oppgaver i meningsfulle aktivitetslinjer (5–12 linjer totalt). Timene skal summere til nøyaktig ${totalHours} t.
+
+Svar KUN med et JSON-array — ingen forklaring, ingen markdown, kun JSON:
+[{"aktivitet":"...","periode":"...","timer":X.X}, ...]
+
+Periode-format: "Jan 2026", "Feb 2026" osv. basert på når arbeidet ble utført.`;
+
+  try {
+    const raw = await callAI(prompt, 1200, 'Du er en norsk M&A-rådgiver. Svar alltid med kun gyldig JSON-array, ingen annen tekst.');
+    // Trekk ut JSON fra svaret
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('Ingen JSON i svar');
+    const lines = JSON.parse(match[0]);
+    _timeoversiktLines = lines.map(l => ({
+      aktivitet: String(l.aktivitet || ''),
+      periode:   String(l.periode || ''),
+      timer:     Number(l.timer) || 0,
+      timesats:  ts,
+    }));
+  } catch (e) {
+    // Fallback: jevn fordeling
+    _timeoversiktLines = tasks.length
+      ? tasks.map(t => ({
+          aktivitet: t.name,
+          periode:   _taskPeriode(t),
+          timer:     totalHours > 0 ? Math.round((totalHours / tasks.length) * 2) / 2 : '',
+          timesats:  ts,
+        }))
+      : [{ aktivitet: '', periode: '', timer: totalHours || '', timesats: ts }];
+  }
 
   _renderTimeoversiktModal(p, c);
 }
