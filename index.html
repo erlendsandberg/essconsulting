@@ -3204,6 +3204,7 @@ function renderProjectDetail(id) {
         ${p.status !== 'avsluttet' ? `<button class="btn btn-sm" style="background:var(--green-pale);color:#065F46" onclick="closeProject('${p.id}')">✅ Avslutt</button>` : ''}
         <button class="btn btn-ghost btn-sm" style="color:var(--blue);border:1.5px solid var(--blue)" onclick="openProjectReport('${p.id}')">📄 Rapport</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--green);border:1.5px solid var(--green)" onclick="generateOppdragsPDF('${p.id}')">📑 Engasjementsbrev</button>
+        <button class="btn btn-ghost btn-sm" style="color:#7c3aed;border:1.5px solid #7c3aed" onclick="openTimeoversiktModal('${p.id}')">🧾 Timeoversikt</button>
         <button class="btn btn-ghost btn-sm" style="color:#06b6d4;border:1.5px solid #06b6d4" onclick="openVeraMeetingPrep('${p.id}')">🗓 Møteforberedelse</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="confirmDelete('project','${p.id}')">🗑️</button>
       </div>
@@ -7017,6 +7018,11 @@ function openProjectModal(id, preCustomerIdOrPrefill = null) {
         <input class="form-control" id="f-hon-fakt" type="number" min="0" step="1000"
           value="${p?.honorarFakturert||''}" placeholder="0">
       </div>
+      <div class="form-group">
+        <label>Timesats (kr/time)</label>
+        <input class="form-control" id="f-timesats" type="number" min="0" step="100"
+          value="${p?.timesats||2600}" placeholder="2600">
+      </div>
     </div>
 
     <div class="form-actions">
@@ -7097,6 +7103,7 @@ function saveProject(id) {
     honorarEstimert:   toNum('f-hon-est'),
     honorarAvtalt:     toNum('f-hon-avtalt'),
     honorarFakturert:  toNum('f-hon-fakt'),
+    timesats:          toNum('f-timesats') || 2600,
     updatedAt:         now(),
   };
 
@@ -8446,6 +8453,233 @@ function loadDemoData() {
 /* ============================================================
    PROSJEKTRAPPORT — åpnes i nytt vindu, klar for utskrift/PDF
    ============================================================ */
+/* ============================================================
+   TIMEOVERSIKT — modal + PDF-generator
+   ============================================================ */
+let _timeoversiktLines = [];
+
+function openTimeoversiktModal(projectId) {
+  const p = DB.projects.find(x => x.id === projectId);
+  if (!p) return;
+  const c = DB.customers.find(x => x.id === p.customerId);
+  const ts = p.timesats || 2600;
+
+  // Pre-fyll fra fullførte oppgaver, sorter etter completedAt/dueDate
+  const tasks = DB.tasks
+    .filter(t => t.projectId === projectId)
+    .sort((a, b) => (a.completedAt || a.dueDate || '').localeCompare(b.completedAt || b.dueDate || ''));
+
+  _timeoversiktLines = tasks.length
+    ? tasks.map(t => ({
+        aktivitet: t.name,
+        periode:   _taskPeriode(t),
+        timer:     '',
+        timesats:  ts,
+      }))
+    : [{ aktivitet: '', periode: '', timer: '', timesats: ts }];
+
+  _renderTimeoversiktModal(projectId, p, c);
+}
+
+function _taskPeriode(t) {
+  const d = t.completedAt || t.dueDate || '';
+  if (!d) return '';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('nb-NO', { month: 'short', year: 'numeric' })
+    .replace('.', '').replace(' ', ' ');
+}
+
+function _renderTimeoversiktModal(projectId, p, c) {
+  const ts = p.timesats || 2600;
+  document.getElementById('modal').style.maxWidth = '780px';
+  document.getElementById('modalTitle').textContent = '🧾 Timeoversikt';
+
+  const rowsHtml = _timeoversiktLines.map((l, i) => `
+    <tr>
+      <td><input class="form-control" style="font-size:12px;padding:4px 6px" value="${escHtml(l.aktivitet)}"
+        oninput="_toLine(${i},'aktivitet',this.value)" placeholder="Aktivitetsbeskrivelse"></td>
+      <td><input class="form-control" style="font-size:12px;padding:4px 6px;width:110px" value="${escHtml(l.periode)}"
+        oninput="_toLine(${i},'periode',this.value)" placeholder="Feb 2026"></td>
+      <td><input class="form-control" style="font-size:12px;padding:4px 6px;width:72px;text-align:right" type="number" min="0" step="0.5"
+        value="${l.timer}" oninput="_toLine(${i},'timer',this.value)" placeholder="0,0"></td>
+      <td><input class="form-control" style="font-size:12px;padding:4px 6px;width:88px;text-align:right" type="number" min="0" step="100"
+        value="${l.timesats}" oninput="_toLine(${i},'timesats',this.value)"></td>
+      <td style="text-align:right;font-size:12px;padding:4px 8px;white-space:nowrap">
+        ${l.timer ? (Number(l.timer) * Number(l.timesats)).toLocaleString('nb-NO') : '—'}
+      </td>
+      <td><button class="btn btn-ghost btn-sm" style="color:var(--red);padding:2px 6px" onclick="_removeTimeoversiktLine(${i})">✕</button></td>
+    </tr>`).join('');
+
+  const sumTimer = _timeoversiktLines.reduce((s, l) => s + (Number(l.timer) || 0), 0);
+  const sumBelop = _timeoversiktLines.reduce((s, l) => s + (Number(l.timer) || 0) * (Number(l.timesats) || 0), 0);
+  const mva = Math.round(sumBelop * 0.25);
+  const total = sumBelop + mva;
+
+  document.getElementById('modalBody').innerHTML = `
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+      <strong>${escHtml(c?.name || '')}</strong> — ${escHtml(p.name)}
+      &nbsp;·&nbsp; Timesats NOK ${ts.toLocaleString('nb-NO')} + MVA
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:8px">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border);font-size:11px;color:var(--text-muted)">
+          <th style="text-align:left;padding:4px 6px">Aktivitet</th>
+          <th style="text-align:left;padding:4px 6px">Periode</th>
+          <th style="text-align:right;padding:4px 6px">Timer</th>
+          <th style="text-align:right;padding:4px 6px">Sats</th>
+          <th style="text-align:right;padding:4px 8px">Beløp</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <button class="btn btn-ghost btn-sm" style="font-size:12px;margin-bottom:16px"
+      onclick="_addTimeoversiktLine(${p.timesats||2600})">+ Legg til linje</button>
+    <div style="border-top:2px solid var(--border);padding-top:10px;font-size:13px">
+      <div style="display:flex;justify-content:space-between;padding:3px 8px">
+        <span>Sum timer / beløp ex. MVA</span>
+        <span><strong>${sumTimer.toLocaleString('nb-NO', {minimumFractionDigits:1,maximumFractionDigits:1})}</strong>
+          &nbsp;&nbsp; NOK ${sumBelop.toLocaleString('nb-NO')}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:3px 8px;color:var(--text-muted)">
+        <span>MVA (25 %)</span><span>NOK ${mva.toLocaleString('nb-NO')}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:3px 8px;font-weight:700">
+        <span>Totalt inkl. MVA</span><span>NOK ${total.toLocaleString('nb-NO')}</span>
+      </div>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--text-muted)">
+      <em>Merknad: Timer er avrundet til nærmeste halve time.</em>
+    </div>`;
+
+  document.getElementById('modalFooter').innerHTML = `
+    <button class="btn btn-secondary" onclick="closeModal()">Avbryt</button>
+    <button class="btn btn-primary" style="background:#7c3aed;border-color:#7c3aed"
+      onclick="_exportTimeoversiktPdf('${p.id}')">⬇ Last ned PDF</button>`;
+  openModal();
+}
+
+function _toLine(i, field, val) {
+  _timeoversiktLines[i][field] = val;
+  // Oppdater beløp-kolonnen live uten full re-render
+  const p = DB.projects.find(x => x.id === APP.projectDetailId);
+  const c = p ? DB.customers.find(x => x.id === p.customerId) : null;
+  if (p) _renderTimeoversiktModal(APP.projectDetailId, p, c);
+}
+function _addTimeoversiktLine(ts) {
+  _timeoversiktLines.push({ aktivitet: '', periode: '', timer: '', timesats: ts });
+  const p = DB.projects.find(x => x.id === APP.projectDetailId);
+  const c = p ? DB.customers.find(x => x.id === p.customerId) : null;
+  if (p) _renderTimeoversiktModal(APP.projectDetailId, p, c);
+}
+function _removeTimeoversiktLine(i) {
+  _timeoversiktLines.splice(i, 1);
+  const p = DB.projects.find(x => x.id === APP.projectDetailId);
+  const c = p ? DB.customers.find(x => x.id === p.customerId) : null;
+  if (p) _renderTimeoversiktModal(APP.projectDetailId, p, c);
+}
+
+function _exportTimeoversiktPdf(projectId) {
+  const p = DB.projects.find(x => x.id === projectId);
+  const c = DB.customers.find(x => x.id === p?.customerId);
+  const lines = _timeoversiktLines.filter(l => l.aktivitet);
+  if (!lines.length) { showToast('Ingen linjer å eksportere', 'info'); return; }
+
+  if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = () => _doTimeoversiktPdf(p, c, lines);
+    document.head.appendChild(s);
+    return;
+  }
+  _doTimeoversiktPdf(p, c, lines);
+}
+
+function _doTimeoversiktPdf(p, c, lines) {
+  const { jsPDF } = window.jspdf || window;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, lm = 20, rm = 20, cw = W - lm - rm;
+  const ts = p.timesats || 2600;
+
+  // ── Header-boks ──────────────────────────────────────────────
+  doc.setFillColor(26, 43, 76);
+  doc.rect(lm, 15, cw, 28, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+  doc.text('TIMEOVERSIKT', W / 2, 26, { align: 'center' });
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text(`${c?.name || ''} \u2013 ${p.name}`, W / 2, 33, { align: 'center' });
+  doc.setFontSize(8);
+  doc.text(
+    `ESS Consulting AS  |  Erlend Synnes-Sandberg AFA  |  Timesats NOK ${ts.toLocaleString('nb-NO')} + MVA`,
+    W / 2, 39, { align: 'center' }
+  );
+
+  // ── Tabell-header ────────────────────────────────────────────
+  doc.setTextColor(0, 0, 0);
+  const cols = { akt: lm, per: 120, tim: 145, sats: 162, belop: 179 };
+  let y = 52;
+  doc.setFillColor(230, 234, 241);
+  doc.rect(lm, y - 5, cw, 7, 'F');
+  doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+  doc.text('Aktivitet',       cols.akt + 1, y);
+  doc.text('Periode',         cols.per,     y);
+  doc.text('Faktiske timer',  cols.tim + 14, y, { align: 'right' });
+  doc.text('Timesats (NOK)',  cols.sats + 16, y, { align: 'right' });
+  doc.text('Beløp (NOK)',     cols.belop + 11, y, { align: 'right' });
+  y += 5;
+
+  // ── Rader ───────────────────────────────────────────────────
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  let sumTimer = 0, sumBelop = 0;
+  lines.forEach((l, idx) => {
+    if (y > 255) { doc.addPage(); y = 20; }
+    if (idx % 2 === 1) { doc.setFillColor(245, 247, 250); doc.rect(lm, y - 4, cw, 6.5, 'F'); }
+    const timer = Number(l.timer) || 0;
+    const sats  = Number(l.timesats) || ts;
+    const belop = timer * sats;
+    sumTimer += timer; sumBelop += belop;
+    const aktTxt = doc.splitTextToSize(l.aktivitet, 90)[0] || '';
+    doc.text(aktTxt,                                     cols.akt + 1, y);
+    doc.text(l.periode || '',                            cols.per, y);
+    doc.text(timer ? timer.toFixed(1) : '',              cols.tim + 14, y, { align: 'right' });
+    doc.text(sats.toLocaleString('nb-NO'),               cols.sats + 16, y, { align: 'right' });
+    doc.text(belop ? belop.toLocaleString('nb-NO') : '', cols.belop + 11, y, { align: 'right' });
+    y += 6.5;
+  });
+
+  // ── Sum-rad ──────────────────────────────────────────────────
+  y += 1;
+  doc.setDrawColor(26, 43, 76); doc.setLineWidth(0.4);
+  doc.line(lm, y - 1, W - rm, y - 1);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Sum timer / beløp ex. MVA', cols.akt + 1, y + 4);
+  doc.text(sumTimer.toFixed(1),                          cols.tim + 14, y + 4, { align: 'right' });
+  doc.text(sumBelop.toLocaleString('nb-NO'),             cols.belop + 11, y + 4, { align: 'right' });
+
+  // ── MVA + Total ──────────────────────────────────────────────
+  const mva   = Math.round(sumBelop * 0.25);
+  const total = sumBelop + mva;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  y += 10;
+  doc.text('MVA (25 %)', cols.akt + 1, y);
+  doc.text(mva.toLocaleString('nb-NO'), cols.belop + 11, y, { align: 'right' });
+  y += 6;
+  doc.setFillColor(26, 43, 76);
+  doc.rect(lm, y - 4.5, cw, 7, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
+  doc.text('Totalt inkl. MVA', cols.akt + 1, y + 0.5);
+  doc.text(total.toLocaleString('nb-NO'), cols.belop + 11, y + 0.5, { align: 'right' });
+
+  // ── Fotnote ──────────────────────────────────────────────────
+  doc.setTextColor(100, 100, 100); doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
+  doc.text('Merknad: Timer er avrundet til nærmeste halve time.', lm, y + 14);
+
+  const dato = new Date().toISOString().slice(0, 10);
+  doc.save(`timeoversikt_${(c?.name || 'prosjekt').replace(/\s+/g,'_')}_${dato}.pdf`);
+  showToast('Timeoversikt eksportert', 'success');
+}
+
 function openProjectReport(projectId) {
   const p = DB.projects.find(x => x.id === projectId);
   if (!p) return;
