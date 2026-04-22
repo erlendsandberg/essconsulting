@@ -8489,7 +8489,9 @@ async function _aiTimeoversiktForslag(p, c) {
     .sort((a, b) => (a.completedAt || a.dueDate || '').localeCompare(b.completedAt || b.dueDate || ''));
 
   const notes = DB.notes.filter(n => n.projectId === p.id).map(n => n.text).join('\n').slice(0, 2000);
-  const docs  = DB.documents.filter(d => d.projectId === p.id).map(d => d.name).join(', ');
+  const docs  = DB.documents.filter(d => d.projectId === p.id)
+    .map(d => `- ${d.name}${d.text ? ': ' + d.text.slice(0, 200) : ''}`)
+    .join('\n').slice(0, 3000);
   const log   = DB.activityLog.filter(e => e.projectId === p.id)
     .sort((a,b) => b.ts.localeCompare(a.ts)).slice(0, 30)
     .map(e => e.tekst).join('\n').slice(0, 1500);
@@ -8514,7 +8516,8 @@ TOTALT ANTALL TIMER Å FORDELE: ${totalHours} t
 UTFØRTE OPPGAVER OG LEVERANSER:
 ${taskList || '(ingen registrert)'}
 
-UTARBEIDEDE DOKUMENTER: ${docs || '(ingen)'}
+UTARBEIDEDE DOKUMENTER OG LEVERANSER:
+${docs || '(ingen)'}
 
 NOTATER/AKTIVITET:
 ${(notes || log || '(ingen)')}
