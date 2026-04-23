@@ -5773,15 +5773,15 @@ function _buildOppdragsPDF(p, c, typeLabel) {
   // ── LOGO ─────────────────────────────────────────────────
   const logoB64 = window._ESS_LOGO_B64 || '';
   if (logoB64) {
-    // Logo venstrejustert, liten og diskret øverst til venstre
+    // Logo midtstilt, liten og diskret øverst
     const lW = 40, lH = 10;
-    doc.addImage('data:image/png;base64,' + logoB64, 'PNG', marginL, y, lW, lH);
+    doc.addImage('data:image/png;base64,' + logoB64, 'PNG', (W - lW) / 2, y, lW, lH);
     y += lH + 4;
   } else {
     setFont('bold', 13);
-    doc.text('ESSCONSULTING', marginL, y + 6);
+    doc.text('ESSCONSULTING', W / 2, y + 6, { align: 'center' });
     setFont('normal', 7.5, GRAY);
-    doc.text('TILLIT. TALL. MENNESKER. VERDIER.', marginL, y + 11);
+    doc.text('TILLIT. TALL. MENNESKER. VERDIER.', W / 2, y + 11, { align: 'center' });
     y += 16;
   }
 
