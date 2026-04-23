@@ -5827,15 +5827,14 @@ function _buildOppdragsPDF(p, c, typeLabel) {
   text('Honorar og utgifter', marginL, y); y += 5;
   setFont('normal', 10);
 
-  const avt  = Number(p.honorarAvtalt)    || 0;
-  const est  = Number(p.honorarEstimert)  || 0;
-  const honorarBeløp = avt || est;
+  const avt = Number(p.honorarAvtalt) || 0;
 
   let honorarTekst = '';
-  if (honorarBeløp > 0) {
-    honorarTekst = `Avtalt honorar for oppdraget er kr ${honorarBeløp.toLocaleString('no-NO')} ekskl. mva.`;
+  if (avt > 0) {
+    honorarTekst = `Avtalt honorar for oppdraget er kr ${avt.toLocaleString('no-NO')} ekskl. mva.`;
   } else {
-    honorarTekst = 'Honorar avtales basert på medgått tid i henhold til våre gjeldende timesatser.';
+    const sats = Number(p.timesats) || 2600;
+    honorarTekst = `Honorar faktureres etter medgått tid i henhold til våre gjeldende timesatser. Vår ordinære timesats er kr ${sats.toLocaleString('no-NO')} per time ekskl. mva.`;
   }
   honorarTekst += ' Utgifter vi pådrar oss for å utføre oppdraget dekkes etter regning.';
   y = wrapText(honorarTekst, marginL, y, contentW, 5.5) + 3;
