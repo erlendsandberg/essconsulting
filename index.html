@@ -6,7 +6,7 @@
 <title>ESS Consulting AS – Prosjektstyring</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&display=swap" rel="stylesheet">
 
 <!-- Firebase compat SDK (vanlige script-tagger, ingen module-timing-problemer) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -32,7 +32,7 @@
 /* ============================================================
    CSS VARIABLER OG RESET
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&display=swap');
 
 :root {
   --navy:        #1B2A4A;
@@ -41,11 +41,11 @@
   --blue:        #2E75B6;
   --blue-light:  #4A90CC;
   --blue-pale:   #E6F1FB;
-  --green:       #1D6B54;
-  --green-pale:  #E1F5EE;
-  --yellow:      #C4793A;
+  --green:       #2E8B7A;
+  --green-pale:  #E0F5F0;
+  --yellow:      #B8742A;
   --yellow-pale: #FDF6ED;
-  --orange:      #C4793A;
+  --orange:      #B8742A;
   --orange-pale: #FDF6ED;
   --red:         #C0392B;
   --red-pale:    #FDECEA;
@@ -103,11 +103,11 @@ ul { list-style: none; }
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .sidebar-logo .brand {
-  font-size: 13px;
-  font-weight: 700;
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  font-weight: 400;
   color: #fff;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
 .sidebar-logo .sub {
   font-size: 11px;
@@ -132,7 +132,7 @@ ul { list-style: none; }
 .nav-item.active {
   background: var(--navy-hover);
   color: #fff;
-  border-left-color: var(--blue);
+  border-left-color: var(--yellow);
 }
 .nav-item .icon { width: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .sidebar-section-label {
@@ -169,10 +169,11 @@ ul { list-style: none; }
   z-index: 50;
 }
 #topbar .page-title {
-  font-size: 17px;
-  font-weight: 600;
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  font-weight: 400;
   color: var(--text);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.5px;
   flex: 1;
 }
 .btn {
@@ -221,9 +222,9 @@ ul { list-style: none; }
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  border-radius: 20px;
+  border-radius: 5px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   gap: 5px;
   white-space: nowrap;
 }
@@ -232,13 +233,13 @@ ul { list-style: none; }
 .badge-pagar        { background: var(--blue-pale); color: var(--blue); }
 .badge-venter-kunde { background: var(--yellow-pale); color: #7A3B1E; }
 .badge-venter-leveranse { background: var(--orange-pale); color: #7A3B1E; }
-.badge-klar-avslutning  { background: var(--green-pale); color: #0D4A38; }
+.badge-klar-avslutning  { background: var(--green-pale); color: #2E8B7A; }
 .badge-avsluttet    { background: #F5F4F0; color: #2A3344; }
-.badge-fullfort     { background: var(--green-pale); color: #0D4A38; }
+.badge-fullfort     { background: var(--green-pale); color: #2E8B7A; }
 .badge-overdue      { background: var(--red-pale); color: var(--red); }
 
 /* TASK STATUS */
-.task-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.task-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
 .task-badge.ikke-startet { background: #F5F4F0; color: #7A7168; }
 .task-badge.pagar        { background: var(--blue-pale); color: var(--blue); }
 .task-badge.avventer     { background: var(--yellow-pale); color: #7A3B1E; }
@@ -261,8 +262,19 @@ ul { list-style: none; }
   justify-content: space-between;
   gap: 12px;
 }
-.card-title { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; }
+.card-title { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 400; color: var(--text); letter-spacing: -0.2px; }
 .card-body { padding: 20px; }
+
+/* Fraunces utility */
+.fraunces { font-family: 'Fraunces', serif !important; font-weight: 400; }
+.section-heading {
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: -0.3px;
+  color: var(--text);
+  margin-bottom: 20px;
+}
 
 /* ============================================================
    DASHBOARD – STAT BAR
@@ -287,15 +299,15 @@ ul { list-style: none; }
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #2E75B6, #1D6B54);
+  background: linear-gradient(90deg, #2E75B6, #2E8B7A);
 }
-.vera-card.mode-green::before { background: linear-gradient(90deg,#1D6B54,#1D6B54); }
-.vera-card.mode-yellow::before { background: linear-gradient(90deg,#C4793A,#C4793A); }
+.vera-card.mode-green::before { background: linear-gradient(90deg,#2E8B7A,#2E8B7A); }
+.vera-card.mode-yellow::before { background: linear-gradient(90deg,#B8742A,#B8742A); }
 .vera-card.mode-red::before { background: linear-gradient(90deg,#ef4444,#dc2626); }
 
 .vera-avatar {
   width: 38px; height: 38px;
-  background: linear-gradient(135deg,#2E75B6,#1D6B54);
+  background: linear-gradient(135deg,#2E75B6,#2E8B7A);
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; flex-shrink: 0;
@@ -313,7 +325,7 @@ ul { list-style: none; }
   font-size: 10.5px; font-weight: 600; padding: 2px 8px;
   border-radius: 20px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.4);
 }
-.vera-mode-badge.green { background:rgba(29,107,84,0.18); color:#3DA882; }
+.vera-mode-badge.green { background:rgba(29,107,84,0.18); color:#2E8B7A; }
 .vera-mode-badge.yellow { background:rgba(245,158,11,0.18); color:#fcd34d; }
 .vera-mode-badge.red { background:rgba(239,68,68,0.18); color:#fca5a5; }
 
@@ -363,7 +375,7 @@ ul { list-style: none; }
 #vera-fab {
   position: fixed; bottom: 28px; right: 28px; z-index: 8000;
   width: 52px; height: 52px; border-radius: 50%;
-  background: linear-gradient(135deg,#2E75B6,#1D6B54);
+  background: linear-gradient(135deg,#2E75B6,#2E8B7A);
   border: none; cursor: pointer; box-shadow: 0 4px 20px rgba(27,42,74,0.35);
   font-size: 22px; display: flex; align-items: center; justify-content: center;
   transition: transform .2s, box-shadow .2s;
@@ -372,7 +384,7 @@ ul { list-style: none; }
 #vera-fab .vera-fab-badge {
   position: absolute; top: -2px; right: -2px;
   width: 14px; height: 14px; border-radius: 50%;
-  background: #1D6B54; border: 2px solid var(--navy);
+  background: #2E8B7A; border: 2px solid var(--navy);
   display: none;
 }
 #vera-fab .vera-fab-badge.show { display: block; }
@@ -401,7 +413,7 @@ ul { list-style: none; }
 }
 .vera-chat-head-avatar {
   width: 32px; height: 32px; border-radius: 50%;
-  background: linear-gradient(135deg,#2E75B6,#1D6B54);
+  background: linear-gradient(135deg,#2E75B6,#2E8B7A);
   display: flex; align-items: center; justify-content: center;
   font-size: 15px; flex-shrink: 0;
 }
@@ -795,7 +807,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   align-items: center;
   justify-content: space-between;
 }
-.modal-title { font-size: 16px; font-weight: 700; }
+.modal-title { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 400; letter-spacing: -0.3px; }
 .modal-close {
   background: none;
   border: none;
@@ -1086,7 +1098,7 @@ tr:hover td { background: #FAFAFA; }
   align-items: center;
   gap: 8px;
 }
-.toast.success { background: #0D4A38; }
+.toast.success { background: #1D6B54; }
 .toast.error   { background: #991B1B; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -2945,7 +2957,7 @@ function renderFollowup() {
     yellow: 'background:var(--yellow-pale);color:#7A3B1E',
     orange: 'background:var(--orange-pale);color:#7A3B1E',
     blue:   'background:var(--blue-pale);color:#1E40AF',
-    green:  'background:var(--green-pale);color:#0D4A38',
+    green:  'background:var(--green-pale);color:#1D6B54',
   };
 
   let tableRows = '';
@@ -3036,7 +3048,7 @@ function renderProjectDetail(id) {
             <div class="next-step-label">Klar for milepæl</div>
             <div class="next-step-text">${escHtml(nextMilestone.name)}</div>
           </div>
-          <button class="btn btn-sm" style="background:var(--green-pale);color:#0D4A38;white-space:nowrap"
+          <button class="btn btn-sm" style="background:var(--green-pale);color:#1D6B54;white-space:nowrap"
             onclick="completeTask('${nextMilestone.id}')">Fullfør milepæl →</button>
         </div>`;
       } else if (nextTask) {
@@ -3059,7 +3071,7 @@ function renderProjectDetail(id) {
           <div class="next-step-label">Alle faser fullført</div>
           <div class="next-step-text">Prosjektet er klart for avslutning</div>
         </div>
-        ${p.status !== 'avsluttet' ? `<button class="btn btn-sm" style="background:var(--green-pale);color:#0D4A38" onclick="closeProject('${p.id}')">Avslutt prosjekt</button>` : ''}
+        ${p.status !== 'avsluttet' ? `<button class="btn btn-sm" style="background:var(--green-pale);color:#1D6B54" onclick="closeProject('${p.id}')">Avslutt prosjekt</button>` : ''}
       </div>`;
     }
   }
@@ -3212,7 +3224,7 @@ function renderProjectDetail(id) {
       <div class="flex gap-8 items-center flex-wrap">
         ${badge(p.status)}
         <button class="btn btn-ghost btn-sm" onclick="openProjectModal('${p.id}')">✏️ Rediger</button>
-        ${p.status !== 'avsluttet' ? `<button class="btn btn-sm" style="background:var(--green-pale);color:#0D4A38" onclick="closeProject('${p.id}')">✅ Avslutt</button>` : ''}
+        ${p.status !== 'avsluttet' ? `<button class="btn btn-sm" style="background:var(--green-pale);color:#1D6B54" onclick="closeProject('${p.id}')">✅ Avslutt</button>` : ''}
         <button class="btn btn-ghost btn-sm" style="color:var(--blue);border:1.5px solid var(--blue)" onclick="openProjectReport('${p.id}')">📄 Rapport</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--green);border:1.5px solid var(--green)" onclick="generateOppdragsPDF('${p.id}')">📑 Engasjementsbrev</button>
         <button class="btn btn-ghost btn-sm" style="color:#7c3aed;border:1.5px solid #7c3aed" onclick="openTimeoversiktModal('${p.id}')">🧾 Timeoversikt</button>
@@ -3887,7 +3899,7 @@ function renderCalendar() {
     cond ? `<button class="btn btn-ghost btn-sm" onclick="APP.calMonthOffset=0;APP.timelineOffset=0;navigate('calendar')" style="font-size:11px;padding:2px 8px">I dag</button>` : '';
 
   return `<div class="mb-24">
-    <h2 style="font-size:20px;font-weight:700;margin-bottom:20px">📅 Kalender</h2>
+    <h2 style="font-family:'Fraunces',serif;font-size:20px;font-weight:400;letter-spacing:-0.3px;margin-bottom:20px">📅 Kalender</h2>
 
     <!-- TIDSLINJE -->
     <div class="card mb-16">
@@ -3913,7 +3925,7 @@ function renderCalendar() {
             const right = parseFloat(pct(p.endDate)   ?? '100');
             if (right < 0 || left > 100) return '';
             const width = Math.max(0.8, right - left).toFixed(2);
-            const colors = ['var(--blue)','var(--green)','#8b5cf6','#C4793A','#06b6d4','#ec4899'];
+            const colors = ['var(--blue)','var(--green)','#8b5cf6','#B8742A','#06b6d4','#ec4899'];
             const col    = colors[i % colors.length];
             return `<div style="position:relative;height:28px;margin-bottom:6px"
               onclick="navigate('project-detail',{projectId:'${p.id}'})" title="${escHtml(p.name)}">
@@ -4014,7 +4026,7 @@ function renderOkonomi() {
     let statusDot = '';
     if (avt > 0) {
       if (pct >= 100)      statusDot = `<span title="Fullt fakturert" style="color:var(--green)">●</span>`;
-      else if (pct >= 50)  statusDot = `<span title="${pct}% fakturert" style="color:var(--yellow,#C4793A)">●</span>`;
+      else if (pct >= 50)  statusDot = `<span title="${pct}% fakturert" style="color:var(--yellow,#B8742A)">●</span>`;
       else                 statusDot = `<span title="${pct}% fakturert" style="color:var(--red)">●</span>`;
     }
 
@@ -4056,7 +4068,7 @@ function renderOkonomi() {
       : `<span style="color:var(--red);font-size:12px">▼ ${Math.abs(ytdDiff)}% vs ${lastYear}</span>`;
 
   return `<div class="mb-24">
-    <h2 style="font-size:20px;font-weight:700;margin-bottom:20px">💰 Økonomi</h2>
+    <h2 style="font-family:'Fraunces',serif;font-size:20px;font-weight:400;letter-spacing:-0.3px;margin-bottom:20px">💰 Økonomi</h2>
 
     <!-- NØKKELTALL -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
@@ -4064,7 +4076,7 @@ function renderOkonomi() {
         { label:'Estimert totalt',       val: totEst,  sub: 'alle prosjekter',        color: 'var(--blue)',  drill:'est'  },
         { label:'Avtalt totalt',          val: totAvt,  sub: 'alle prosjekter',        color: 'var(--blue)',  drill:'avt'  },
         { label:'Fakturert totalt',       val: totFakt, sub: 'alle prosjekter',        color: 'var(--green)', drill:'fakt' },
-        { label:'Gjenstår å fakturere',   val: totGjen, sub: 'avtalt minus fakturert', color: totGjen > 0 ? 'var(--yellow,#C4793A)' : 'var(--green)', drill:'gjen' },
+        { label:'Gjenstår å fakturere',   val: totGjen, sub: 'avtalt minus fakturert', color: totGjen > 0 ? 'var(--yellow,#B8742A)' : 'var(--green)', drill:'gjen' },
       ].map(k => `<div class="card" onclick="showOkonomiDrilldown('${k.drill}')"
           style="padding:16px 18px;cursor:pointer;transition:box-shadow 0.15s"
           onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.10)'"
@@ -8619,7 +8631,7 @@ function _renderTimeoversiktModal(p, c) {
       ${honorar ? `<button class="btn btn-secondary btn-sm" onclick="_fordeltimer('${p.id}')">↺ Fordel timer på nytt</button>` : ''}
     </div>
     ${!p.honorarAvtalt ? `
-    <div style="background:#fffbeb;border:1px solid #C4793A;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+    <div style="background:#fffbeb;border:1px solid #B8742A;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
       <span>⚠️ <strong>Avtalt honorar er ikke registrert.</strong> Timer er estimert av AI — resultat blir mer presist om du setter honorar på prosjektet.</span>
       <button class="btn btn-secondary btn-sm" style="white-space:nowrap" onclick="closeModal();openProjectModal('${p.id}')">Sett honorar</button>
     </div>` : ''}
@@ -8823,10 +8835,10 @@ function openProjectReport(projectId) {
   const statusMap = {
     'ikke-startet':     { label: 'Ikke startet',        color: '#7A7168' },
     'pagar':            { label: 'Pågår',               color: '#2E75B6' },
-    'venter-kunde':     { label: 'Venter på kunde',     color: '#C4793A' },
-    'venter-leveranse': { label: 'Venter på leveranse', color: '#C4793A' },
-    'klar-avslutning':  { label: 'Klar for avslutning', color: '#1D6B54' },
-    'avsluttet':        { label: 'Avsluttet',           color: '#1D6B54' },
+    'venter-kunde':     { label: 'Venter på kunde',     color: '#B8742A' },
+    'venter-leveranse': { label: 'Venter på leveranse', color: '#B8742A' },
+    'klar-avslutning':  { label: 'Klar for avslutning', color: '#2E8B7A' },
+    'avsluttet':        { label: 'Avsluttet',           color: '#2E8B7A' },
   };
   const st = statusMap[p.status] || { label: p.status, color: '#7A7168' };
   const pct = p.progress;
@@ -8845,7 +8857,7 @@ function openProjectReport(projectId) {
 
       const taskRows = regularTasks.map(t => {
         const isDoneT = t.status === 'fullfort';
-        const statusDot = isDoneT ? '#1D6B54' : t.status === 'pagar' ? '#2E75B6' : '#D1D5DB';
+        const statusDot = isDoneT ? '#2E8B7A' : t.status === 'pagar' ? '#2E75B6' : '#D1D5DB';
         const completedStr = t.completedAt ? `<span class="task-date">Fullført ${fmtShort(t.completedAt)}</span>` : '';
         const dueStr = t.dueDate && !t.completedAt ? `<span class="task-date">Frist ${fmtShort(t.dueDate)}</span>` : '';
         return `
@@ -8894,7 +8906,7 @@ function openProjectReport(projectId) {
     if (manualTasks.length) {
       const taskRows = manualTasks.map(t => {
         const isDoneT = t.status === 'fullfort';
-        const statusDot = isDoneT ? '#1D6B54' : t.status === 'pagar' ? '#2E75B6' : '#D1D5DB';
+        const statusDot = isDoneT ? '#2E8B7A' : t.status === 'pagar' ? '#2E75B6' : '#D1D5DB';
         return `
         <tr class="${isDoneT ? 'done-row' : ''}">
           <td class="task-dot-cell"><span class="dot" style="background:${statusDot}"></span></td>
@@ -8919,7 +8931,7 @@ function openProjectReport(projectId) {
     // No template — flat task list
     const rows = allTasks.map(t => {
       const isDoneT = t.status === 'fullfort';
-      const statusDot = isDoneT ? '#1D6B54' : t.status === 'pagar' ? '#2E75B6' : '#D1D5DB';
+      const statusDot = isDoneT ? '#2E8B7A' : t.status === 'pagar' ? '#2E75B6' : '#D1D5DB';
       return `
       <tr class="${isDoneT ? 'done-row' : ''}">
         <td class="task-dot-cell"><span class="dot" style="background:${statusDot}"></span></td>
@@ -9084,7 +9096,7 @@ function openProjectReport(projectId) {
     background: #2E75B6;
     transition: width 0.4s;
   }
-  .progress-fill.green { background: #1D6B54; }
+  .progress-fill.green { background: #2E8B7A; }
   .progress-fill.red   { background: #EF4444; }
   .progress-pct {
     font-size: 13px;
@@ -9160,7 +9172,7 @@ function openProjectReport(projectId) {
     background: #E0DDD6; color: #7A7168;
     flex-shrink: 0;
   }
-  .phase-number.done { background: #1D6B54; color: #fff; }
+  .phase-number.done { background: #2E8B7A; color: #fff; }
   .phase-title { font-size: 13px; font-weight: 700; color: #1B2A4A; }
   .phase-count { font-size: 11.5px; color: #7A7168; font-weight: 600; }
   .phase-done .phase-header { background: #F0FDF4; }
@@ -9210,7 +9222,7 @@ function openProjectReport(projectId) {
   .milestone-date { font-size: 11.5px; font-weight: 600; color: #7A7168; }
   .milestone-pending-label {
     font-size: 11px; font-weight: 700;
-    color: #C4793A;
+    color: #B8742A;
     background: #FDF6ED;
     border: 1px solid #FDE68A;
     border-radius: 4px;
@@ -9259,7 +9271,7 @@ function openProjectReport(projectId) {
     flex-shrink: 0;
   }
   .tl-dot-milestone {
-    background: #1D6B54;
+    background: #2E8B7A;
     box-shadow: 0 0 0 2px #A7F3D0;
     width: 14px; height: 14px;
     left: -6px; top: 3px;
@@ -9271,12 +9283,12 @@ function openProjectReport(projectId) {
   .tl-milestone-chip {
     display: inline-block;
     font-size: 10px; font-weight: 700;
-    background: #E1F5EE; color: #1D6B54;
+    background: #E1F5EE; color: #2E8B7A;
     border-radius: 4px; padding: 1px 6px; margin-right: 5px;
     text-transform: uppercase; letter-spacing: 0.04em;
     vertical-align: middle;
   }
-  .tl-item.tl-milestone .tl-name { color: #0D4A38; }
+  .tl-item.tl-milestone .tl-name { color: #2E8B7A; }
 
   /* ---- PRINT BUTTON ---- */
   .print-bar {
@@ -9377,11 +9389,11 @@ function openProjectReport(projectId) {
     <div class="lbl">Oppgaver totalt</div>
   </div>
   <div class="stat-card">
-    <div class="val" style="color:#1D6B54">${doneT}</div>
+    <div class="val" style="color:#2E8B7A">${doneT}</div>
     <div class="lbl">Fullført</div>
   </div>
   <div class="stat-card">
-    <div class="val" style="color:${openT > 0 ? '#C4793A' : '#1D6B54'}">${openT}</div>
+    <div class="val" style="color:${openT > 0 ? '#B8742A' : '#2E8B7A'}">${openT}</div>
     <div class="lbl">Gjenstår</div>
   </div>
   <div class="stat-card">
