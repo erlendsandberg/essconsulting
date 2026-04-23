@@ -8827,7 +8827,7 @@ function _doTimeoversiktPdf(p, c, lines) {
     if (idx % 2 === 1) { doc.setFillColor(245, 247, 250); doc.rect(lm, y - 4, cw, rowH + 1, 'F'); }
     doc.text(aktLines,                                   colAkt + 1, y);
     doc.text(l.periode || '',                            colPer,     y);
-    doc.text(timer ? timer.toFixed(1) : '',              colTimR,    y, { align: 'right' });
+    doc.text(timer ? timer.toLocaleString('nb-NO', {minimumFractionDigits:1,maximumFractionDigits:1}) : '', colTimR, y, { align: 'right' });
     doc.text(sats.toLocaleString('nb-NO'),               colSatR,    y, { align: 'right' });
     doc.text(belop ? belop.toLocaleString('nb-NO') : '', colBelR,    y, { align: 'right' });
     y += rowH;
@@ -8839,7 +8839,7 @@ function _doTimeoversiktPdf(p, c, lines) {
   doc.line(lm, y - 1, W - rm, y - 1);
   doc.setFont('helvetica', 'bold');
   doc.text('Sum timer / beløp ex. MVA', colAkt + 1, y + 4);
-  doc.text(sumTimer.toFixed(1),              colTimR, y + 4, { align: 'right' });
+  doc.text(sumTimer.toLocaleString('nb-NO', {minimumFractionDigits:1,maximumFractionDigits:1}), colTimR, y + 4, { align: 'right' });
   doc.text(sumBelop.toLocaleString('nb-NO'), colBelR, y + 4, { align: 'right' });
 
   // ── MVA + Total ──────────────────────────────────────────────
