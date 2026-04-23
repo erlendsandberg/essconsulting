@@ -8862,7 +8862,7 @@ function _doTimeoversiktPdf(p, c, lines) {
     y += 8;
     doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
     doc.text('Allerede fakturert', colAkt + 1, y);
-    doc.text(`\u2212 ${_timeoversiktFakturert.toLocaleString('nb-NO')}`, colBelR, y, { align: 'right' });
+    doc.text(`- ${_timeoversiktFakturert.toLocaleString('nb-NO')}`, colBelR, y, { align: 'right' });
     y += 6;
     doc.setFillColor(184, 116, 42);
     doc.rect(lm, y - 4.5, cw, 7, 'F');
