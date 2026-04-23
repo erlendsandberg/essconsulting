@@ -5773,10 +5773,10 @@ function _buildOppdragsPDF(p, c, typeLabel) {
   // ── LOGO ─────────────────────────────────────────────────
   const logoB64 = window._ESS_LOGO_B64 || '';
   if (logoB64) {
-    // Logo sentrert, maks 80mm bred, proposjonal høyde (orig ca 4:1)
-    const lW = 72, lH = 18;
-    doc.addImage('data:image/png;base64,' + logoB64, 'PNG', (W - lW) / 2, y, lW, lH);
-    y += lH + 6;
+    // Logo venstrejustert, liten og diskret øverst til venstre
+    const lW = 40, lH = 10;
+    doc.addImage('data:image/png;base64,' + logoB64, 'PNG', marginL, y, lW, lH);
+    y += lH + 4;
   } else {
     setFont('bold', 18);
     doc.text('ESSCONSULTING', W / 2, y + 8, { align: 'center' });
