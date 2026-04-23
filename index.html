@@ -557,7 +557,7 @@ ul { list-style: none; }
   text-decoration: none;
 }
 .proj-row:last-child { border-bottom: none; }
-.proj-row:hover { background: #FAFBFC; }
+.proj-row:hover { background: rgba(27,42,74,0.03); }
 .proj-row-accent {
   width: 4px;
   align-self: stretch;
@@ -972,7 +972,7 @@ tr:hover td { background: #FAFAFA; }
 /* I DAG */
 .today-task-row { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.12s; }
 .today-task-row:last-child { border-bottom:none; }
-.today-task-row:hover { background:var(--navy-hover); }
+.today-task-row:hover { background: rgba(27,42,74,0.05); }
 .today-task-row.overdue { background:rgba(239,68,68,0.05); }
 .check-btn { width:22px; height:22px; border-radius:50%; border:2px solid var(--border); background:none; color:transparent; cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s; }
 .check-btn:hover { border-color:var(--green); color:var(--green); }
@@ -980,7 +980,7 @@ tr:hover td { background: #FAFAFA; }
 
 /* KALENDER */
 .cal-cell { min-height:64px; border:1px solid var(--border); border-radius:5px; padding:4px 5px; cursor:pointer; transition:background 0.12s; display:flex; flex-direction:column; gap:2px; }
-.cal-cell:hover { background:var(--navy-hover); }
+.cal-cell:hover { background: rgba(27,42,74,0.05); }
 .cal-today { border-color:var(--blue); background:rgba(37,99,235,0.08); }
 .cal-day { font-size:12px; font-weight:700; color:var(--text-muted); }
 .cal-day-overdue { color:var(--red); }
@@ -1232,7 +1232,7 @@ tr:hover td { background: #FAFAFA; }
   transition: background 0.12s;
 }
 .fu-row:last-child { border-bottom: none; }
-.fu-row:hover { background: #FAFBFC; }
+.fu-row:hover { background: rgba(27,42,74,0.03); }
 .fu-row td { padding: 13px 14px; vertical-align: middle; }
 .fu-row td:first-child { padding-right: 6px; }
 .fu-dot {
@@ -1291,7 +1291,7 @@ tr:hover td { background: #FAFAFA; }
   transition: all 0.15s;
   background: var(--white);
 }
-.proj-type-card:hover { border-color: var(--blue); background: var(--blue-pale); }
+.proj-type-card:hover { border-color: var(--navy); background: rgba(27,42,74,0.05); }
 .proj-type-card.selected { border-color: var(--blue); background: var(--blue-pale); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
 .proj-type-icon { font-size: 22px; margin-bottom: 5px; }
 .proj-type-label { font-size: 11.5px; font-weight: 600; color: var(--text); line-height: 1.3; }
@@ -1499,7 +1499,7 @@ tr:hover td { background: #FAFAFA; }
 }
 .tpl-card:last-child { border-bottom: none; }
 .tpl-category-group:last-child .tpl-card:last-child { border-bottom: none; }
-.tpl-card:hover { background: #FAFBFC; }
+.tpl-card:hover { background: rgba(27,42,74,0.03); }
 .tpl-card input[type=checkbox] {
   margin-top: 3px;
   flex-shrink: 0;
@@ -1537,7 +1537,7 @@ tr:hover td { background: #FAFAFA; }
   transition: all 0.12s;
   margin-top: 1px;
 }
-.tpl-use-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-pale); }
+.tpl-use-btn:hover { border-color: var(--navy); color: var(--navy); background: rgba(27,42,74,0.05); }
 
 /* Open tasks panel — project groups */
 .fu-project-group {
@@ -1551,7 +1551,7 @@ tr:hover td { background: #FAFAFA; }
   border-bottom: 1px solid var(--border);
   cursor: pointer; transition: background 0.12s;
 }
-.fu-project-header:hover { background: var(--blue-pale); }
+.fu-project-header:hover { background: rgba(27,42,74,0.04); }
 .fu-project-name { font-size: 13.5px; font-weight: 700; color: var(--text); }
 .fu-project-customer { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
 .fu-task-counter {
@@ -1566,9 +1566,9 @@ tr:hover td { background: #FAFAFA; }
   cursor: pointer; transition: background 0.12s;
 }
 .fu-task-row:last-child { border-bottom: none; }
-.fu-task-row:hover { background: #F9FAFB; }
+.fu-task-row:hover { background: rgba(27,42,74,0.03); }
 .fu-task-row.fu-task-milestone { background: linear-gradient(90deg, rgba(59,130,246,0.04), transparent); }
-.fu-task-row.fu-task-milestone:hover { background: var(--blue-pale); }
+.fu-task-row.fu-task-milestone:hover { background: rgba(184,116,42,0.06); }
 .fu-task-body { flex: 1; min-width: 0; }
 .fu-task-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
 .fu-task-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 11.5px; color: var(--text-muted); }
@@ -1627,7 +1627,7 @@ tr:hover td { background: #FAFAFA; }
   transition: background 0.12s;
 }
 .brreg-item:last-child { border-bottom: none; }
-.brreg-item:hover { background: var(--blue-pale); }
+.brreg-item:hover { background: rgba(27,42,74,0.04); }
 .brreg-item-name {
   font-size: 13.5px;
   font-weight: 700;
