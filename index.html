@@ -8480,12 +8480,14 @@ function loadDemoData() {
    ============================================================ */
 let _timeoversiktLines = [];
 let _timeoversiktProjId = null;
+let _timeoversiktFakturert = 0;
 
 function openTimeoversiktModal(projectId) {
   const p = DB.projects.find(x => x.id === projectId);
   if (!p) return;
   const c = DB.customers.find(x => x.id === p.customerId);
   _timeoversiktProjId = projectId;
+  _timeoversiktFakturert = 0;
 
   // Vis spinner umiddelbart mens AI jobber
   document.getElementById('modal').style.maxWidth = '800px';
@@ -8594,14 +8596,14 @@ function _renderTimeoversiktModal(p, c) {
   const rowsHtml = _timeoversiktLines.map((l, i) => `
     <tr>
       <td style="padding:3px 4px"><input class="form-control" style="font-size:12px;padding:3px 6px" value="${escHtml(l.aktivitet)}"
-        oninput="_toLine(${i},'aktivitet',this.value)" placeholder="Aktivitetsbeskrivelse"></td>
+        onchange="_toLine(${i},'aktivitet',this.value)" placeholder="Aktivitetsbeskrivelse"></td>
       <td style="padding:3px 4px"><input class="form-control" style="font-size:12px;padding:3px 6px;width:100px" value="${escHtml(String(l.periode||''))}"
-        oninput="_toLine(${i},'periode',this.value)" placeholder="Feb 2026"></td>
+        onchange="_toLine(${i},'periode',this.value)" placeholder="Feb 2026"></td>
       <td style="padding:3px 4px"><input class="form-control" style="font-size:12px;padding:3px 6px;width:68px;text-align:right" type="number" min="0" step="0.5"
-        value="${l.timer}" oninput="_toLine(${i},'timer',this.value)" placeholder="0,0"></td>
+        value="${l.timer}" oninput="_toLineNum(${i},'timer',this.value)" placeholder="0,0"></td>
       <td style="padding:3px 4px"><input class="form-control" style="font-size:12px;padding:3px 6px;width:82px;text-align:right" type="number" min="0" step="100"
-        value="${l.timesats}" oninput="_toLine(${i},'timesats',this.value)"></td>
-      <td style="text-align:right;font-size:12px;padding:3px 8px;white-space:nowrap;min-width:70px">
+        value="${l.timesats}" oninput="_toLineNum(${i},'timesats',this.value)"></td>
+      <td id="to-belop-${i}" style="text-align:right;font-size:12px;padding:3px 8px;white-space:nowrap;min-width:70px">
         ${l.timer ? (Number(l.timer)*Number(l.timesats)).toLocaleString('nb-NO') : '—'}
       </td>
       <td style="padding:3px 2px"><button class="btn btn-ghost btn-sm" style="color:var(--red);padding:2px 6px" onclick="_removeTimeoversiktLine(${i})">✕</button></td>
@@ -8652,19 +8654,30 @@ function _renderTimeoversiktModal(p, c) {
     </div>
     <button class="btn btn-ghost btn-sm" style="font-size:12px;margin-top:8px"
       onclick="_addTimeoversiktLine(${ts})">+ Legg til linje</button>
-    <div style="border-top:2px solid var(--border);margin-top:12px;padding-top:10px;font-size:13px">
+    <div style="border-top:2px solid var(--border);margin-top:12px;padding-top:10px;font-size:13px" id="to-sums">
       <div style="display:flex;justify-content:space-between;padding:3px 8px;font-weight:600">
         <span>Sum timer / beløp ex. MVA</span>
-        <span>${sumTimer.toLocaleString('nb-NO',{minimumFractionDigits:1,maximumFractionDigits:1})} t
+        <span id="to-sum-txt">${sumTimer.toLocaleString('nb-NO',{minimumFractionDigits:1,maximumFractionDigits:1})} t
           &nbsp;&nbsp; NOK ${sumBelop.toLocaleString('nb-NO')}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:3px 8px;color:var(--text-muted)">
-        <span>MVA (25 %)</span><span>NOK ${mva.toLocaleString('nb-NO')}</span>
+        <span>MVA (25 %)</span><span id="to-mva-val">NOK ${mva.toLocaleString('nb-NO')}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:3px 8px;font-weight:700;font-size:14px">
-        <span>Totalt inkl. MVA</span><span>NOK ${total.toLocaleString('nb-NO')}</span>
+        <span>Totalt inkl. MVA</span><span id="to-total-val">NOK ${total.toLocaleString('nb-NO')}</span>
       </div>
-      ${diffHtml}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px 3px;color:var(--text-muted);border-top:1px dashed var(--border);margin-top:6px">
+        <span>Allerede fakturert</span>
+        <span style="display:flex;align-items:center;gap:4px">− NOK <input type="number" min="0" step="1000" id="to-fakturert-input"
+          class="form-control" style="width:90px;text-align:right;font-size:13px;padding:2px 6px"
+          value="${_timeoversiktFakturert || ''}"
+          oninput="_setTimeoversiktFakturert(this.value)"
+          placeholder="0"></span>
+      </div>
+      <div id="to-denne-row" style="display:${_timeoversiktFakturert > 0 ? 'flex' : 'none'};justify-content:space-between;padding:3px 8px;font-weight:700;font-size:14px;color:var(--navy)">
+        <span>Denne faktura inkl. MVA</span><span id="to-denne-val">NOK ${(total - (_timeoversiktFakturert||0)).toLocaleString('nb-NO')}</span>
+      </div>
+      <div id="to-diff-row">${diffHtml}</div>
     </div>
     <div style="margin-top:16px;font-size:11px;color:var(--text-muted)">
       <em>Merknad: Timer er avrundet til nærmeste halve time.</em>
@@ -8689,10 +8702,51 @@ function _fordeltimer(projectId) {
 }
 
 function _toLine(i, field, val) {
+  // Tekst-felt (aktivitet, periode) — kalles fra onchange, ingen re-render
   _timeoversiktLines[i][field] = val;
+}
+function _toLineNum(i, field, val) {
+  // Tall-felt (timer, timesats) — oppdater beløpscelle + totaler
+  _timeoversiktLines[i][field] = val;
+  const l = _timeoversiktLines[i];
+  const rowBelop = (Number(l.timer) || 0) * (Number(l.timesats) || 0);
+  const cell = document.getElementById(`to-belop-${i}`);
+  if (cell) cell.textContent = rowBelop ? rowBelop.toLocaleString('nb-NO') : '—';
+  _updateTimeoversiktSums();
+}
+function _setTimeoversiktFakturert(val) {
+  _timeoversiktFakturert = Number(val) || 0;
+  _updateTimeoversiktSums();
+}
+function _updateTimeoversiktSums() {
   const p = DB.projects.find(x => x.id === _timeoversiktProjId);
-  const c = p ? DB.customers.find(x => x.id === p.customerId) : null;
-  if (p) _renderTimeoversiktModal(p, c);
+  if (!p) return;
+  const ts = p.timesats || 2600;
+  const honorar = p.honorarAvtalt || 0;
+  const sumTimer = _timeoversiktLines.reduce((s, l) => s + (Number(l.timer) || 0), 0);
+  const sumBelop = _timeoversiktLines.reduce((s, l) => s + (Number(l.timer)||0) * (Number(l.timesats)||0), 0);
+  const mva = Math.round(sumBelop * 0.25);
+  const total = sumBelop + mva;
+  const fakturert = _timeoversiktFakturert || 0;
+  const el = id => document.getElementById(id);
+  const sumTxt = el('to-sum-txt');
+  if (sumTxt) sumTxt.innerHTML = `${sumTimer.toLocaleString('nb-NO',{minimumFractionDigits:1,maximumFractionDigits:1})} t &nbsp;&nbsp; NOK ${sumBelop.toLocaleString('nb-NO')}`;
+  const mvaEl = el('to-mva-val');
+  if (mvaEl) mvaEl.textContent = `NOK ${mva.toLocaleString('nb-NO')}`;
+  const totalEl = el('to-total-val');
+  if (totalEl) totalEl.textContent = `NOK ${total.toLocaleString('nb-NO')}`;
+  const denneRow = el('to-denne-row');
+  if (denneRow) denneRow.style.display = fakturert > 0 ? 'flex' : 'none';
+  const denneVal = el('to-denne-val');
+  if (denneVal) denneVal.textContent = `NOK ${(total - fakturert).toLocaleString('nb-NO')}`;
+  const diff = honorar > 0 ? (honorar - sumBelop) : null;
+  const diffRow = el('to-diff-row');
+  if (diffRow) diffRow.innerHTML = diff !== null ? `
+    <div style="margin-top:6px;font-size:12px;color:${Math.abs(diff)<1?'var(--green)':diff>0?'var(--red)':'var(--text-muted)'}">
+      ${diff === 0 ? '✓ Timer stemmer med avtalt honorar' : diff > 0
+        ? `Timer underdekkende med NOK ${diff.toLocaleString('nb-NO')} (${(diff/ts).toFixed(1)} t mangler)`
+        : `Timer overdekkende med NOK ${Math.abs(diff).toLocaleString('nb-NO')} (${(Math.abs(diff)/ts).toFixed(1)} t for mye)`}
+    </div>` : '';
 }
 function _addTimeoversiktLine(ts) {
   _timeoversiktLines.push({ aktivitet: '', periode: '', timer: '', timesats: ts });
@@ -8738,23 +8792,25 @@ function _doTimeoversiktPdf(p, c, lines) {
   doc.setFontSize(9); doc.setFont('helvetica', 'normal');
   doc.text(`${c?.name || ''} \u2013 ${p.name}`, W / 2, 33, { align: 'center' });
   doc.setFontSize(8);
-  doc.text(
-    `ESS Consulting AS  |  Erlend Synnes-Sandberg AFA  |  Timesats NOK ${ts.toLocaleString('nb-NO')} + MVA`,
-    W / 2, 39, { align: 'center' }
-  );
+  doc.text('ESS Consulting AS  |  Erlend Synnes-Sandberg AFA', W / 2, 39, { align: 'center' });
 
   // ── Tabell-header ────────────────────────────────────────────
+  // Kolonner definert ved venstre-kant (akt, per) og høyre-kant (tim, sats, belop)
   doc.setTextColor(0, 0, 0);
-  const cols = { akt: lm, per: 120, tim: 145, sats: 162, belop: 179 };
+  const colAkt  = lm;          // venstre kant aktivitet
+  const colPer  = 112;         // venstre kant periode
+  const colTimR = 152;         // høyre kant timer
+  const colSatR = 170;         // høyre kant timesats
+  const colBelR = W - rm;      // høyre kant beløp = 190
   let y = 52;
   doc.setFillColor(230, 234, 241);
   doc.rect(lm, y - 5, cw, 7, 'F');
   doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
-  doc.text('Aktivitet',       cols.akt + 1, y);
-  doc.text('Periode',         cols.per,     y);
-  doc.text('Faktiske timer',  cols.tim + 14, y, { align: 'right' });
-  doc.text('Timesats (NOK)',  cols.sats + 16, y, { align: 'right' });
-  doc.text('Beløp (NOK)',     cols.belop + 11, y, { align: 'right' });
+  doc.text('Aktivitet',    colAkt + 1, y);
+  doc.text('Periode',      colPer,     y);
+  doc.text('Timer',        colTimR,    y, { align: 'right' });
+  doc.text('Sats (NOK)',   colSatR,    y, { align: 'right' });
+  doc.text('Beløp (NOK)',  colBelR,    y, { align: 'right' });
   y += 5;
 
   // ── Rader ───────────────────────────────────────────────────
@@ -8765,15 +8821,15 @@ function _doTimeoversiktPdf(p, c, lines) {
     const sats   = Number(l.timesats) || ts;
     const belop  = timer * sats;
     sumTimer += timer; sumBelop += belop;
-    const aktLines = doc.splitTextToSize(l.aktivitet, cols.per - cols.akt - 3);
+    const aktLines = doc.splitTextToSize(l.aktivitet, colPer - colAkt - 3);
     const rowH = Math.max(6.5, aktLines.length * 5);
     if (y + rowH > 260) { doc.addPage(); y = 20; }
     if (idx % 2 === 1) { doc.setFillColor(245, 247, 250); doc.rect(lm, y - 4, cw, rowH + 1, 'F'); }
-    doc.text(aktLines,                                   cols.akt + 1, y);
-    doc.text(l.periode || '',                            cols.per, y);
-    doc.text(timer ? timer.toFixed(1) : '',              cols.tim + 14, y, { align: 'right' });
-    doc.text(sats.toLocaleString('nb-NO'),               cols.sats + 16, y, { align: 'right' });
-    doc.text(belop ? belop.toLocaleString('nb-NO') : '', cols.belop + 11, y, { align: 'right' });
+    doc.text(aktLines,                                   colAkt + 1, y);
+    doc.text(l.periode || '',                            colPer,     y);
+    doc.text(timer ? timer.toFixed(1) : '',              colTimR,    y, { align: 'right' });
+    doc.text(sats.toLocaleString('nb-NO'),               colSatR,    y, { align: 'right' });
+    doc.text(belop ? belop.toLocaleString('nb-NO') : '', colBelR,    y, { align: 'right' });
     y += rowH;
   });
 
@@ -8782,23 +8838,38 @@ function _doTimeoversiktPdf(p, c, lines) {
   doc.setDrawColor(26, 43, 76); doc.setLineWidth(0.4);
   doc.line(lm, y - 1, W - rm, y - 1);
   doc.setFont('helvetica', 'bold');
-  doc.text('Sum timer / beløp ex. MVA', cols.akt + 1, y + 4);
-  doc.text(sumTimer.toFixed(1),                          cols.tim + 14, y + 4, { align: 'right' });
-  doc.text(sumBelop.toLocaleString('nb-NO'),             cols.belop + 11, y + 4, { align: 'right' });
+  doc.text('Sum timer / beløp ex. MVA', colAkt + 1, y + 4);
+  doc.text(sumTimer.toFixed(1),              colTimR, y + 4, { align: 'right' });
+  doc.text(sumBelop.toLocaleString('nb-NO'), colBelR, y + 4, { align: 'right' });
 
   // ── MVA + Total ──────────────────────────────────────────────
   const mva   = Math.round(sumBelop * 0.25);
   const total = sumBelop + mva;
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
   y += 10;
-  doc.text('MVA (25 %)', cols.akt + 1, y);
-  doc.text(mva.toLocaleString('nb-NO'), cols.belop + 11, y, { align: 'right' });
+  doc.text('MVA (25 %)', colAkt + 1, y);
+  doc.text(mva.toLocaleString('nb-NO'), colBelR, y, { align: 'right' });
   y += 6;
   doc.setFillColor(26, 43, 76);
   doc.rect(lm, y - 4.5, cw, 7, 'F');
   doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
-  doc.text('Totalt inkl. MVA', cols.akt + 1, y + 0.5);
-  doc.text(total.toLocaleString('nb-NO'), cols.belop + 11, y + 0.5, { align: 'right' });
+  doc.text('Totalt inkl. MVA', colAkt + 1, y + 0.5);
+  doc.text(total.toLocaleString('nb-NO'), colBelR, y + 0.5, { align: 'right' });
+
+  // ── Allerede fakturert / Denne faktura ──────────────────────
+  if (_timeoversiktFakturert > 0) {
+    const denneFaktura = total - _timeoversiktFakturert;
+    y += 8;
+    doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    doc.text('Allerede fakturert', colAkt + 1, y);
+    doc.text(`\u2212 ${_timeoversiktFakturert.toLocaleString('nb-NO')}`, colBelR, y, { align: 'right' });
+    y += 6;
+    doc.setFillColor(184, 116, 42);
+    doc.rect(lm, y - 4.5, cw, 7, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
+    doc.text('Denne faktura inkl. MVA', colAkt + 1, y + 0.5);
+    doc.text(denneFaktura.toLocaleString('nb-NO'), colBelR, y + 0.5, { align: 'right' });
+  }
 
   // ── Fotnote ──────────────────────────────────────────────────
   doc.setTextColor(100, 100, 100); doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
