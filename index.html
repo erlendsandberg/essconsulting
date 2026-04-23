@@ -5778,11 +5778,11 @@ function _buildOppdragsPDF(p, c, typeLabel) {
     doc.addImage('data:image/png;base64,' + logoB64, 'PNG', marginL, y, lW, lH);
     y += lH + 4;
   } else {
-    setFont('bold', 18);
-    doc.text('ESSCONSULTING', W / 2, y + 8, { align: 'center' });
-    setFont('normal', 8, GRAY);
-    doc.text('TILLIT. TALL. MENNESKER. VERDIER.', W / 2, y + 14, { align: 'center' });
-    y += 20;
+    setFont('bold', 13);
+    doc.text('ESSCONSULTING', marginL, y + 6);
+    setFont('normal', 7.5, GRAY);
+    doc.text('TILLIT. TALL. MENNESKER. VERDIER.', marginL, y + 11);
+    y += 16;
   }
 
   hLine(y);
