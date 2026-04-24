@@ -3425,7 +3425,8 @@ function renderProjectDetail(id) {
     <div class="card-body">
       <div class="form-group mb-12" style="margin-bottom:12px">
         <textarea class="form-control" id="newNoteInput"
-          placeholder="Skriv en statusoppdatering eller internt notat..." rows="2"></textarea>
+          placeholder="Skriv en statusoppdatering eller internt notat..." rows="2"
+          oninput="_noteDraft=this.value">${escHtml(_noteDraft)}</textarea>
       </div>
       <button class="btn btn-primary btn-sm mb-16" style="margin-bottom:16px"
         onclick="addNote('${p.id}')">Legg til notat</button>
@@ -7681,6 +7682,7 @@ function addNote(projectId) {
   const input = document.getElementById('newNoteInput');
   const text = input?.value.trim();
   if (!text) { showToast('Skriv et notat først', 'error'); return; }
+  _noteDraft = '';  // tøm utkast etter lagring
   DB.notes.push({ id: uid(), projectId, text, createdAt: now() });
   logActivity('notat', projectId, `Notat: ${text.slice(0, 80)}${text.length > 80 ? '…' : ''}`);
   persistAll({toast: 'Notat lagret'});
@@ -8478,6 +8480,7 @@ function loadDemoData() {
 /* ============================================================
    TIMEOVERSIKT — modal + PDF-generator
    ============================================================ */
+let _noteDraft = '';   // bevarer notat-utkast på tvers av render()
 let _timeoversiktLines = [];
 let _timeoversiktProjId = null;
 let _timeoversiktFakturert = 0;
