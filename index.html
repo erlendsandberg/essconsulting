@@ -1833,7 +1833,7 @@ tr:hover td { background: #FAFAFA; }
       <button id="hamburger" onclick="toggleSidebar()">☰</button>
       <div class="page-title" id="pageTitle">Dashboard</div>
       <button class="btn btn-ghost btn-sm" onclick="openCustomerModal(null)">+ Ny kunde</button>
-      <button class="btn btn-ghost btn-sm" onclick="openQuickEstimateModal()" title="Rask prisestimering">${_ICON_AI} Prisestimat</button>
+      <button id="topbar-ai-btn" class="btn btn-ghost btn-sm" onclick="openQuickEstimateModal()" title="Rask prisestimering">✦ Prisestimat</button>
       <button class="btn btn-primary btn-sm" onclick="openProjectModal(null)">+ Nytt prosjekt</button>
     </header>
     <main id="content">
@@ -9536,6 +9536,9 @@ function doLogout() {
 }
 
 async function initApp() {
+  const aiBtn = document.getElementById('topbar-ai-btn');
+  if (aiBtn) aiBtn.innerHTML = _ICON_AI + ' Prisestimat';
+
   const bar = document.getElementById('fb-loading-bar');
   const msg = document.getElementById('fb-loading-msg');
   if (bar) bar.style.width = '50%';
