@@ -6188,15 +6188,50 @@ function renderAnmerkninger() {
         : 'Ingen treff for søk/filter.'}
     </div>`;
 
+  // ── Status-kort ──────────────────────────────────────────────
+  const scraperLog = Array.isArray(DB.config?.scraperLog) ? DB.config.scraperLog : [];
+  const lastRun = scraperLog.length > 0 ? scraperLog[scraperLog.length - 1] : null;
+  const nextMonday = _nextMondayAt10();
+  const nextStr = nextMonday.toLocaleDateString('nb-NO', {weekday:'long',day:'numeric',month:'long'}) + ' kl. 10:00';
+  const lastRunHtml = lastRun
+    ? `${fmtDate(lastRun.ts)} kl. ${new Date(lastRun.ts).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'})}
+       <span class="badge" style="margin-left:6px;background:${lastRun.added>0?'var(--yellow-pale)':'var(--bg)'};color:${lastRun.added>0?'var(--yellow)':'var(--text-muted)'}">${lastRun.added > 0 ? lastRun.added + ' nye' : 'ingen nye'}</span>`
+    : `<span style="color:var(--text-muted);font-style:italic">Aldri kjørt</span>`;
+  const logRows = scraperLog.slice().reverse().slice(0, 6).map(e => `
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="color:var(--text-muted)">${fmtDate(e.ts)} kl. ${new Date(e.ts).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'})}</span>
+      <span>${e.added > 0 ? `<strong style="color:var(--navy)">${e.added} nye</strong>` : '0 nye'} &nbsp;·&nbsp; ${e.totalAlerts ?? '?'} totalt i basen</span>
+    </div>`).join('');
+
   return `
   <div class="page-header">
     <h1>⚠️ Betalingsanmerkninger</h1>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <span style="color:var(--text-muted);font-size:13px">${filtered.length} av ${DB.creditAlerts.length} totalt${DB.config?.lastIngest ? ` · Sist oppdatert ${fmtDate(DB.config.lastIngest)} kl. ${new Date(DB.config.lastIngest).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'})}` : ''}</span>
-      <button class="btn btn-secondary btn-sm" onclick="exportAlertsCsv()">Eksporter CSV</button>
-      <button class="btn btn-secondary btn-sm" onclick="exportAlertsPdf()">Eksporter PDF</button>
-      <button id="refresh-anmerkninger-btn" class="btn btn-secondary btn-sm" onclick="refreshAnmerkninger()">↻ Oppdater</button>
-      <button class="btn btn-primary btn-sm" onclick="runScraperProtocol()">▶ Kjør scraper</button>
+    <span style="color:var(--text-muted);font-size:13px">${filtered.length} av ${DB.creditAlerts.length} totalt</span>
+  </div>
+  <div class="card mb-24">
+    <div class="card-body" style="padding:16px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:4px">SISTE KJØRING</div>
+          <div style="font-size:13px">${lastRunHtml}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:8px">
+            Neste automatiske: <strong style="color:var(--text)">${nextStr}</strong>
+            &nbsp;·&nbsp; Rapport sendes på e-post til Erlend, Sondre og Kenneth
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="exportAlertsCsv()">Eksporter CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportAlertsPdf()">Eksporter PDF</button>
+          <button class="btn btn-secondary btn-sm" onclick="downloadTaskSchedulerXml()" title="Last ned XML for Windows Oppgaveplanlegger">⬇ Oppgaveplan</button>
+          <button id="refresh-anmerkninger-btn" class="btn btn-secondary btn-sm" onclick="refreshAnmerkninger()">↻ Oppdater</button>
+          <button class="btn btn-primary btn-sm" onclick="runScraperProtocol()">▶ Kjør nå</button>
+        </div>
+      </div>
+      ${scraperLog.length > 0 ? `
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:6px">KJØRELOGG</div>
+        ${logRows}
+      </div>` : `<div style="margin-top:12px;font-size:12px;color:var(--text-muted);font-style:italic">Ingen kjøringer registrert ennå. Kjør scraperen manuelt eller sett opp automatisk via Oppgaveplan-knappen.</div>`}
     </div>
   </div>
   <div class="card mb-24">
@@ -6218,9 +6253,93 @@ function renderAnmerkninger() {
 function setAlertSearch(v) { window._alertSearch = v; _debouncedRender(); }
 function setAlertDays(v)   { window._alertDays   = v; render(); }
 
+function _nextMondayAt10() {
+  const now = new Date();
+  const day = now.getDay(); // 0=søn, 1=man
+  const daysUntil = day === 1 && now.getHours() < 10 ? 0 : day === 1 ? 7 : (8 - day) % 7 || 7;
+  const next = new Date(now);
+  next.setDate(now.getDate() + daysUntil);
+  next.setHours(10, 0, 0, 0);
+  return next;
+}
+
+function downloadTaskSchedulerXml() {
+  const batPath = prompt(
+    'Full sti til forvalt-scraper.bat på din maskin:',
+    'C:\\Users\\ErlendSynnes-Sandber\\forvalt.no\\forvalt-scraper.bat'
+  );
+  if (!batPath) return;
+  const startBoundary = _nextMondayAt10().toISOString().slice(0, 19);
+  const xmlPath = batPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>ESS Consulting — ukentlig scraping av betalingsanmerkninger fra forvalt.no</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>${startBoundary}</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByWeek>
+        <WeeksInterval>1</WeeksInterval>
+        <DaysOfWeek><Monday /></DaysOfWeek>
+      </ScheduleByWeek>
+    </CalendarTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
+    <Enabled>true</Enabled>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>${xmlPath}</Command>
+    </Exec>
+  </Actions>
+</Task>`;
+  const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ess-scraper-ukeplan.xml'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('XML lastet ned — importer i Oppgaveplanlegger (taskschd.msc)', 'success');
+}
+
+let _scraperPollInterval = null;
+
 function runScraperProtocol() {
-  showToast('Scraper startet — trykk ↻ Oppdater når den er ferdig', 'info');
+  showToast('Scraper startet — varsler deg automatisk når ferdig…', 'info');
   window.location.href = 'forvalt-scraper://run';
+  const prevIngest = DB.config?.lastIngest || null;
+  const prevCount  = DB.creditAlerts.length;
+  let attempts = 0;
+  if (_scraperPollInterval) clearInterval(_scraperPollInterval);
+  _scraperPollInterval = setInterval(async () => {
+    if (++attempts > 30) {
+      clearInterval(_scraperPollInterval); _scraperPollInterval = null;
+      showToast('Scraper: ingen svar etter 5 min — trykk ↻ Oppdater manuelt', 'info');
+      return;
+    }
+    try {
+      const snap = await _fsDoc.get();
+      const data = snap.data() || {};
+      if (data.config?.lastIngest !== prevIngest || (data.creditAlerts||[]).length !== prevCount) {
+        clearInterval(_scraperPollInterval); _scraperPollInterval = null;
+        await loadAll();
+        if (APP.view === 'anmerkninger') render();
+        const added = DB.creditAlerts.length - prevCount;
+        showToast(added > 0 ? `✓ Scraping ferdig — ${added} nye anmerkninger` : '✓ Scraping ferdig — ingen nye', 'success');
+      }
+    } catch(e) {}
+  }, 10000);
 }
 
 async function refreshAnmerkninger() {

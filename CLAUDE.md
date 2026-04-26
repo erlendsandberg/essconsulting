@@ -29,6 +29,7 @@ ess-consulting/
 | `ANTHROPIC_API_KEY` | `ai.js` | Claude API-nøkkel |
 | `INGEST_TOKEN` | `anmerkninger-ingest.js` | Shared secret for innsending av betalingsanmerkninger |
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | `anmerkninger-ingest.js` | Komplett service-account-JSON fra Firebase Console (Project Settings → Service Accounts) |
+| `RESEND_API_KEY` | `anmerkninger-ingest.js` | API-nøkkel fra resend.com — sender ukentlig e-postrapport til erlend/sondre/kenneth. Krever at `essc.no` er verifisert som avsenderdomene i Resend-dashbordet. Valgfri — e-post hoppes over hvis ikke satt. |
 
 **Hosting:** Netlify (auto-deploy fra GitHub `main`-branch)
 **Database:** Google Firebase Firestore (compat SDK v10.12.0)
