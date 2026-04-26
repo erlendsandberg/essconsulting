@@ -6195,6 +6195,7 @@ function renderAnmerkninger() {
       <span style="color:var(--text-muted);font-size:13px">${filtered.length} av ${DB.creditAlerts.length} totalt${DB.config?.lastIngest ? ` · Sist oppdatert ${fmtDate(DB.config.lastIngest)} kl. ${new Date(DB.config.lastIngest).toLocaleTimeString('nb-NO',{hour:'2-digit',minute:'2-digit'})}` : ''}</span>
       <button class="btn btn-secondary btn-sm" onclick="exportAlertsCsv()">Eksporter CSV</button>
       <button class="btn btn-secondary btn-sm" onclick="exportAlertsPdf()">Eksporter PDF</button>
+      <button id="refresh-anmerkninger-btn" class="btn btn-secondary btn-sm" onclick="refreshAnmerkninger()">↻ Oppdater</button>
       <button class="btn btn-primary btn-sm" onclick="runScraperProtocol()">▶ Kjør scraper</button>
     </div>
   </div>
@@ -6218,8 +6219,16 @@ function setAlertSearch(v) { window._alertSearch = v; _debouncedRender(); }
 function setAlertDays(v)   { window._alertDays   = v; render(); }
 
 function runScraperProtocol() {
-  showToast('Starter forvalt-scraper…', 'info');
+  showToast('Scraper startet — trykk ↻ Oppdater når den er ferdig', 'info');
   window.location.href = 'forvalt-scraper://run';
+}
+
+async function refreshAnmerkninger() {
+  const btn = document.getElementById('refresh-anmerkninger-btn');
+  if (btn) { btn.textContent = '↻ Laster…'; btn.disabled = true; }
+  await loadAll();
+  render();
+  showToast('Betalingsanmerkninger oppdatert', 'success');
 }
 
 function toggleIngestTokenVisibility() {
