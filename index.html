@@ -6271,7 +6271,7 @@ function downloadTaskSchedulerXml() {
   if (!batPath) return;
   const startBoundary = _nextMondayAt10().toISOString().slice(0, 19);
   const xmlPath = batPath.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+  const xml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
     <Description>ESS Consulting — ukentlig scraping av betalingsanmerkninger fra forvalt.no</Description>
@@ -6305,7 +6305,12 @@ function downloadTaskSchedulerXml() {
     </Exec>
   </Actions>
 </Task>`;
-  const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+  // Task Scheduler krever UTF-16 LE med BOM
+  const utf16 = new Uint8Array(xml.length * 2 + 2);
+  const view  = new DataView(utf16.buffer);
+  view.setUint16(0, 0xFEFF, true); // BOM
+  for (let i = 0; i < xml.length; i++) view.setUint16(2 + i * 2, xml.charCodeAt(i), true);
+  const blob = new Blob([utf16], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = 'ess-scraper-ukeplan.xml'; a.click();
