@@ -1907,18 +1907,43 @@ function _documentsTextSize() {
 //   etter persistAll() — ellers viser vi "lagret" selv når skrivingen feiler.
 // Hvis flere persistAll-kall stables i debounce-vinduet, vises siste opts.toast.
 let _pendingToast = null;
+// Sist kjente antall prosjekter/kunder (settes av loadAll, oppdateres ved sletting)
+let _safeProjectCount  = null;
+let _safeCustomerCount = null;
+
 function persistAll(opts = {}) {
   if (opts.toast) _pendingToast = opts.toast;
   clearTimeout(_persistTimer);
   _persistTimer = setTimeout(async () => {
     const toast = _pendingToast;
     _pendingToast = null;
+
+    // ── SIKKERHETSBREMS ────────────────────────────────────────────
+    // Stopp skrivingen om antall prosjekter/kunder faller dramatisk
+    // uten at brukeren har bekreftet sletting (opts.allowShrink).
+    if (!opts.allowShrink) {
+      if (_safeProjectCount !== null && DB.projects.length < _safeProjectCount - 1) {
+        const msg = `Sikkerhetsbrems: ${DB.projects.length} prosjekter i minnet, men ${_safeProjectCount} er det siste kjente. Lagring stoppet for å beskytte data.`;
+        console.error(msg);
+        showToast('⚠️ ' + msg, 'error');
+        return;
+      }
+      if (_safeCustomerCount !== null && DB.customers.length < _safeCustomerCount - 1) {
+        const msg = `Sikkerhetsbrems: ${DB.customers.length} kunder i minnet, men ${_safeCustomerCount} er det siste kjente. Lagring stoppet.`;
+        console.error(msg);
+        showToast('⚠️ ' + msg, 'error');
+        return;
+      }
+    }
+    // ──────────────────────────────────────────────────────────────
+
     if (DB.activityLog.length > ACTIVITY_LOG_CAP) {
       DB.activityLog = DB.activityLog
         .slice()
         .sort((a, b) => (a.ts || '').localeCompare(b.ts || ''))
         .slice(-ACTIVITY_LOG_CAP);
     }
+    const savedAt = new Date().toISOString();
     try {
       await _fsDoc.set({
         customers:        DB.customers,
@@ -1930,11 +1955,16 @@ function persistAll(opts = {}) {
         watchedCompanies: DB.watchedCompanies,
         creditAlerts:     DB.creditAlerts,
         config:           DB.config,
-        _savedAt:  new Date().toISOString(),
+        _savedAt:         savedAt,
       });
+      // Oppdater sikker-telling etter vellykket lagring
+      _safeProjectCount  = DB.projects.length;
+      _safeCustomerCount = DB.customers.length;
       if (toast) showToast(toast, 'success');
       // Lokal snapshot-backup (sikkerhetsnett mot Firestore-tap)
       _maybeSaveLocalSnapshot();
+      // Firestore skyggekopi — bare oppdater om antall prosjekter ikke faller
+      _maybeUpdateFirestoreBackup(savedAt);
     } catch(err) {
       console.error('Firestore write error:', err);
       showToast('Lagring feilet: ' + _firestoreErrorMsg(err), 'error');
@@ -1942,13 +1972,32 @@ function persistAll(opts = {}) {
   }, 800);
 }
 
+// Firestore skyggekopi i db/backup — ratchet: oppdateres kun om data ikke synker
+const _fsBak = firebase.firestore().collection('db').doc('backup');
+async function _maybeUpdateFirestoreBackup(savedAt) {
+  try {
+    const bakSnap = await _fsBak.get();
+    const prevProjects = bakSnap.exists ? (bakSnap.data().projects || []).length : 0;
+    if (DB.projects.length >= prevProjects) {
+      await _fsBak.set({
+        customers: DB.customers, projects: DB.projects, tasks: DB.tasks,
+        notes: DB.notes, documents: DB.documents,
+        watchedCompanies: DB.watchedCompanies, creditAlerts: DB.creditAlerts,
+        _savedAt: savedAt,
+      });
+    }
+  } catch(e) {
+    console.warn('Backup-skriving feilet (ikke kritisk):', e.message);
+  }
+}
+
 /* ============================================================
    LOKAL SNAPSHOT-BACKUP — sikkerhetsnett mot Firestore-tap
    ============================================================ */
 const SNAPSHOTS_KEY = 'ess_local_snapshots';
-const MAX_SNAPSHOTS = 3;
-const MIN_SNAPSHOT_INTERVAL_MS = 10 * 60 * 1000; // ta snapshot maks hvert 10 min
-const MAX_SNAPSHOT_SIZE_BYTES  = 1_500_000;       // ~1.5 MB per snapshot
+const MAX_SNAPSHOTS = 20;                          // økt fra 3 → 20
+const MIN_SNAPSHOT_INTERVAL_MS = 2 * 60 * 1000;   // økt hyppighet: hvert 2. min (ikke 10)
+const MAX_SNAPSHOT_SIZE_BYTES  = 1_500_000;        // ~1.5 MB per snapshot
 
 function _readSnapshots() {
   try { return JSON.parse(localStorage.getItem(SNAPSHOTS_KEY) || '[]'); }
@@ -1975,6 +2024,35 @@ function _maybeSaveLocalSnapshot() {
   }
   snaps.unshift({ ts: now(), sizeKB: Math.round(payload.length / 1024), data: payload });
   _writeSnapshots(snaps.slice(0, MAX_SNAPSHOTS));
+}
+
+async function restoreFromFirestoreBackup() {
+  try {
+    const bakSnap = await _fsBak.get();
+    if (!bakSnap.exists) { showToast('Ingen skyggekopi funnet', 'error'); return; }
+    const bak = bakSnap.data();
+    const projCount = (bak.projects || []).length;
+    if (projCount === 0) { showToast('Skyggekopien er tom — ingen data å gjenopprette', 'error'); return; }
+    confirmAction(
+      'Gjenopprette fra Firestore skyggekopi?',
+      `Skyggekopien fra ${fmtDate(bak._savedAt)} inneholder ${projCount} prosjekter og ${(bak.customers||[]).length} kunder. Dette overskriver gjeldende data.`,
+      async () => {
+        DB.customers        = bak.customers        || [];
+        DB.projects         = bak.projects         || [];
+        DB.tasks            = bak.tasks            || [];
+        DB.notes            = bak.notes            || [];
+        DB.documents        = bak.documents        || [];
+        DB.watchedCompanies = bak.watchedCompanies || [];
+        DB.creditAlerts     = bak.creditAlerts     || [];
+        _safeProjectCount  = DB.projects.length;
+        _safeCustomerCount = DB.customers.length;
+        persistAll({toast: `Gjenopprettet ${projCount} prosjekter fra skyggekopi`, allowShrink: true});
+        navigate('dashboard');
+      }
+    );
+  } catch(e) {
+    showToast('Kunne ikke lese skyggekopi: ' + e.message, 'error');
+  }
 }
 
 function restoreLocalSnapshot(index) {
@@ -2009,7 +2087,7 @@ async function loadAll() {
   try {
     const snap = await _fsDoc.get();
     if (snap.exists) {
-      const d      = snap.data();
+      const d = snap.data();
       DB.customers        = d.customers        || [];
       DB.projects         = d.projects         || [];
       DB.tasks            = d.tasks            || [];
@@ -2019,8 +2097,40 @@ async function loadAll() {
       DB.watchedCompanies = d.watchedCompanies || [];
       DB.creditAlerts     = d.creditAlerts     || [];
       DB.config           = d.config           || { ingestToken: '', lastIngest: '' };
+
+      // Hvis hoveddokumentet har 0 prosjekter, sjekk skyggekopien
+      if (DB.projects.length === 0) {
+        try {
+          const bakSnap = await _fsBak.get();
+          if (bakSnap.exists) {
+            const bak = bakSnap.data();
+            const bakProjects = bak.projects || [];
+            if (bakProjects.length > 0) {
+              console.warn(`loadAll: hoveddok har 0 prosjekter, backup har ${bakProjects.length}. Gjenoppretter automatisk.`);
+              DB.customers        = bak.customers        || DB.customers;
+              DB.projects         = bakProjects;
+              DB.tasks            = bak.tasks            || DB.tasks;
+              DB.notes            = bak.notes            || DB.notes;
+              DB.documents        = bak.documents        || DB.documents;
+              DB.watchedCompanies = bak.watchedCompanies || DB.watchedCompanies;
+              DB.creditAlerts     = bak.creditAlerts     || DB.creditAlerts;
+              showToast('⚠️ Gjenopprettet fra skyggekopi — hoveddokument var tomt', 'info');
+              // Skriv tilbake til hoveddokumentet (men ikke til backup for å unngå løkke)
+              persistAll({ toast: 'Data gjenopprettet og lagret', allowShrink: true });
+            }
+          }
+        } catch(bakErr) {
+          console.warn('Backup-lesing feilet:', bakErr.message);
+        }
+      }
     }
     // else: første gang — tomt DB, vis demodata
+
+    // Oppdater sikker-telling og ta snapshot umiddelbart etter vellykket lasting
+    _safeProjectCount  = DB.projects.length;
+    _safeCustomerCount = DB.customers.length;
+    _maybeSaveLocalSnapshot();   // ta snapshot med én gang (ikke vent 2 min)
+
   } catch(err) {
     console.error('Firestore read error:', err);
     showToast('Kunne ikke laste data: ' + _firestoreErrorMsg(err), 'error');
@@ -6529,29 +6639,45 @@ function renderSettings() {
     </div>
   </div>
 
+  <div class="mb-24">
+    <div class="section-title mb-12" style="margin-bottom:16px">Sikkerhetskopier & gjenoppretting</div>
+    <div class="settings-grid">
+      <div class="settings-card">
+        <h3>☁️ Firestore skyggekopi</h3>
+        <p>Automatisk backup i <code>db/backup</code>. Oppdateres kun når data øker — aldri ved tap. Gjenopprett om hoveddatabasen er skadet.</p>
+        <button class="btn btn-secondary w-full" onclick="restoreFromFirestoreBackup()">↻ Gjenopprett fra skyggekopi</button>
+      </div>
+      <div class="settings-card">
+        <h3>💾 Eksporter JSON-backup</h3>
+        <p>Last ned alle data som en JSON-fil. Oppbevar på OneDrive eller e-post til deg selv. Bruk ved katastrofetap.</p>
+        <button class="btn btn-primary w-full" onclick="exportData()">⬇ Last ned backup nå</button>
+      </div>
+    </div>
+  </div>
+
   ${(() => {
     const snaps = _readSnapshots();
     if (!snaps.length) return `
     <div class="mb-24">
-      <div class="section-title mb-12" style="margin-bottom:16px">Lokale snapshot-backups</div>
+      <div class="section-title mb-12" style="margin-bottom:16px">Lokale snapshot-backups (denne nettleseren)</div>
       <div class="card"><div class="card-body" style="color:var(--text-muted)">
-        Ingen lokale snapshots ennå. Tas automatisk inntil hvert 10. minutt etter vellykket lagring til Firestore. Sikkerhetsnett mot Firestore-feil.
+        Ingen lokale snapshots ennå. Tas automatisk hvert ${MIN_SNAPSHOT_INTERVAL_MS/60000}. min og ved oppstart. Maks ${MAX_SNAPSHOTS} snapshots beholdes.
       </div></div>
     </div>`;
     const rows = snaps.map((s, i) => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;${i < snaps.length-1 ? 'border-bottom:1px solid var(--border)' : ''}">
         <div>
           <div style="font-weight:500">${fmtDate(s.ts)}</div>
-          <div style="font-size:12px;color:var(--text-muted)">${new Date(s.ts).toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'})} · ${s.sizeKB} KB</div>
+          <div style="font-size:12px;color:var(--text-muted)">${new Date(s.ts).toLocaleTimeString('nb-NO', {hour:'2-digit', minute:'2-digit'})} · ${s.sizeKB} KB · ${JSON.parse(s.data).projects?.length || 0} prosjekter</div>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="restoreLocalSnapshot(${i})">↻ Gjenopprett</button>
       </div>`).join('');
     return `
     <div class="mb-24">
-      <div class="section-title mb-12" style="margin-bottom:16px">Lokale snapshot-backups</div>
+      <div class="section-title mb-12" style="margin-bottom:16px">Lokale snapshot-backups (denne nettleseren)</div>
       <div class="card"><div class="card-body">
         <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:8px">
-          Lagres i nettleseren etter vellykket Firestore-skriving (maks ${MAX_SNAPSHOTS}, hvert ${MIN_SNAPSHOT_INTERVAL_MS/60000}. min). Sikkerhetsnett — bruk hvis Firestore-data går tapt eller blir korrupt.
+          Lagres automatisk i nettleseren (maks ${MAX_SNAPSHOTS}, hvert ${MIN_SNAPSHOT_INTERVAL_MS/60000}. min + ved oppstart). Sikkerhetsnett — bruk hvis Firestore-data går tapt.
         </div>
         ${rows}
       </div></div>
@@ -8377,7 +8503,10 @@ function confirmDelete(type, id) {
       } else if (type === 'alert') {
         DB.creditAlerts = DB.creditAlerts.filter(a => a.id !== id);
       }
-      persistAll({toast: 'Slettet'});
+      // allowShrink: true — sikkerhetsbremsene skal ikke stoppe bevisst sletting
+      _safeProjectCount  = DB.projects.length;
+      _safeCustomerCount = DB.customers.length;
+      persistAll({toast: 'Slettet', allowShrink: true});
       render();
     }
   );
@@ -8442,7 +8571,9 @@ function resetAllData() {
     watchedCompanies: [], creditAlerts: [],
     config: { ingestToken: '', lastIngest: '' },
   };
-  persistAll({toast: 'Alle data nullstilt'});
+  _safeProjectCount  = 0;
+  _safeCustomerCount = 0;
+  persistAll({toast: 'Alle data nullstilt', allowShrink: true});
   navigate('dashboard');
 }
 
@@ -9692,6 +9823,9 @@ async function initApp() {
     return;
   }
   navigate('dashboard');
+
+  // Periodisk lokal snapshot-backup hvert 2. minutt (MIN_SNAPSHOT_INTERVAL_MS)
+  setInterval(() => { if (DB.projects.length > 0) _maybeSaveLocalSnapshot(); }, MIN_SNAPSHOT_INTERVAL_MS);
 }
 
 // Keyboard: Escape closes modals
