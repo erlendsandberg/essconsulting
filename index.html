@@ -8,21 +8,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&display=swap" rel="stylesheet">
 
-<!-- Firebase compat SDK (vanlige script-tagger, ingen module-timing-problemer) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<!-- Supabase JS client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-  firebase.initializeApp({
-    apiKey:            "AIzaSyCaTQ9dGrehvAfZAgxVq4N0yDy_Ve4iDl0",
-    authDomain:        "essc-246a1.firebaseapp.com",
-    projectId:         "essc-246a1",
-    storageBucket:     "essc-246a1.firebasestorage.app",
-    messagingSenderId: "210538892469",
-    appId:             "1:210538892469:web:d0a0b534f8e6f8571042fc"
-  });
-  const _fsDoc = firebase.firestore().collection('db').doc('main');
-  const _auth  = firebase.auth();
+  const _supabase = supabase.createClient(
+    'https://qnhdtdctxhltiwofmjmj.supabase.co',
+    'sb_publishable_zo52TmhPZaHScF2-YC9V6w_luE8LUDq'
+  );
 </script>
 <script>
   // ESS Consulting logo (base64)
@@ -1723,10 +1715,10 @@ tr:hover td { background: #FAFAFA; }
     <label class="login-label">E-post</label>
     <input class="login-input" id="login-email" type="email" placeholder="din@epost.no"
       autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()">
-    <label class="login-label">Passord</label>
-    <input class="login-input" id="login-pass" type="password" placeholder="••••••••"
-      autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="login-btn" id="login-btn" onclick="doLogin()">Logg inn</button>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Send innloggingslenke</button>
+    <div id="login-magic-msg" style="display:none;margin-top:14px;padding:12px 16px;background:rgba(255,255,255,0.12);border-radius:8px;font-size:13px;color:rgba(255,255,255,0.9);text-align:center;line-height:1.5">
+      ✉️ Sjekk innboksen din — klikk lenken i e-posten for å logge inn
+    </div>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
@@ -1887,9 +1879,9 @@ let DB = {
   config:           { ingestToken: '', lastIngest: '' },
 };
 
-// Maks antall aktivitetslogg-entries vi beholder. Firestore-dokumentet har
-// 1MB-grense, og activityLog kan vokse uendelig — uten cap risikerer vi
-// at hele appen slutter å lagre.
+// Maks antall aktivitetslogg-entries vi beholder.
+// activityLog kan vokse uendelig — cap forhindrer unødvendig minnebruk
+// og treghet ved lasting/lagring.
 const ACTIVITY_LOG_CAP = 5000;
 
 // Samlet tekst-budsjett for opplastede dokumenter. Per-dokument er allerede
@@ -1901,11 +1893,9 @@ function _documentsTextSize() {
   return DB.documents.reduce((sum, d) => sum + (d.text?.length || 0), 0);
 }
 
-// persistAll(opts?) — debounced lagring til Firestore.
+// persistAll(opts?) — debounced lagring til Supabase.
 // opts.toast: vis denne suksess-meldingen ETTER at lagring er bekreftet.
-//   Bruk i stedet for å kalle showToast('Lagret', 'success') manuelt rett
-//   etter persistAll() — ellers viser vi "lagret" selv når skrivingen feiler.
-// Hvis flere persistAll-kall stables i debounce-vinduet, vises siste opts.toast.
+// opts.allowShrink: true = hopp over sikkerhetsbrems (brukes ved bevisst sletting).
 let _pendingToast = null;
 // Sist kjente antall prosjekter/kunder (settes av loadAll, oppdateres ved sletting)
 let _safeProjectCount  = null;
@@ -1919,8 +1909,6 @@ function persistAll(opts = {}) {
     _pendingToast = null;
 
     // ── SIKKERHETSBREMS ────────────────────────────────────────────
-    // Stopp skrivingen om antall prosjekter/kunder faller dramatisk
-    // uten at brukeren har bekreftet sletting (opts.allowShrink).
     if (!opts.allowShrink) {
       if (_safeProjectCount !== null && DB.projects.length < _safeProjectCount - 1) {
         const msg = `Sikkerhetsbrems: ${DB.projects.length} prosjekter i minnet, men ${_safeProjectCount} er det siste kjente. Lagring stoppet for å beskytte data.`;
@@ -1935,7 +1923,6 @@ function persistAll(opts = {}) {
         return;
       }
     }
-    // ──────────────────────────────────────────────────────────────
 
     if (DB.activityLog.length > ACTIVITY_LOG_CAP) {
       DB.activityLog = DB.activityLog
@@ -1943,56 +1930,52 @@ function persistAll(opts = {}) {
         .sort((a, b) => (a.ts || '').localeCompare(b.ts || ''))
         .slice(-ACTIVITY_LOG_CAP);
     }
-    const savedAt = new Date().toISOString();
+
     try {
-      await _fsDoc.set({
-        customers:        DB.customers,
-        projects:         DB.projects,
-        tasks:            DB.tasks,
-        notes:            DB.notes,
-        activityLog:      DB.activityLog,
-        documents:        DB.documents,
-        watchedCompanies: DB.watchedCompanies,
-        creditAlerts:     DB.creditAlerts,
-        config:           DB.config,
-        _savedAt:         savedAt,
-      });
-      // Oppdater sikker-telling etter vellykket lagring
+      const ops = [];
+      if (DB.customers.length)
+        ops.push(_supabase.from('customers').upsert(DB.customers.map(c => ({ id: c.id, data: c }))));
+      if (DB.projects.length)
+        ops.push(_supabase.from('projects').upsert(DB.projects.map(p => ({ id: p.id, data: p }))));
+      if (DB.tasks.length)
+        ops.push(_supabase.from('tasks').upsert(DB.tasks.map(t => ({ id: t.id, project_id: t.projectId, data: t }))));
+      if (DB.notes.length)
+        ops.push(_supabase.from('notes').upsert(DB.notes.map(n => ({ id: n.id, project_id: n.projectId, data: n }))));
+      if (DB.documents.length)
+        ops.push(_supabase.from('documents').upsert(DB.documents.map(d => ({ id: d.id, project_id: d.projectId, data: d }))));
+      if (DB.activityLog.length)
+        ops.push(_supabase.from('activity_log').upsert(DB.activityLog.map(e => ({ id: e.id, ts: e.ts || new Date().toISOString(), data: e }))));
+      if (DB.watchedCompanies.length)
+        ops.push(_supabase.from('watched_companies').upsert(DB.watchedCompanies.map(w => ({ org_nr: w.orgNr || w.org_nr, data: w }))));
+      if (DB.creditAlerts.length)
+        ops.push(_supabase.from('credit_alerts').upsert(
+          DB.creditAlerts.map(a => ({ id: a.id, org_nr: a.orgNr, ref_nr: a.refNr || '', reg_date: a.regDate, data: a })),
+          { onConflict: 'org_nr,ref_nr,reg_date' }
+        ));
+      ops.push(_supabase.from('config').upsert({
+        id: 1,
+        ingest_token: DB.config?.ingestToken || '',
+        last_ingest:  DB.config?.lastIngest  || null,
+        scraper_log:  DB.config?.scraperLog  || [],
+      }));
+
+      const results = await Promise.all(ops);
+      const failed  = results.filter(r => r.error);
+      if (failed.length) throw new Error(failed.map(r => r.error.message).join('; '));
+
       _safeProjectCount  = DB.projects.length;
       _safeCustomerCount = DB.customers.length;
       if (toast) showToast(toast, 'success');
-      // Lokal snapshot-backup (sikkerhetsnett mot Firestore-tap)
       _maybeSaveLocalSnapshot();
-      // Firestore skyggekopi — bare oppdater om antall prosjekter ikke faller
-      _maybeUpdateFirestoreBackup(savedAt);
     } catch(err) {
-      console.error('Firestore write error:', err);
-      showToast('Lagring feilet: ' + _firestoreErrorMsg(err), 'error');
+      console.error('Supabase write error:', err);
+      showToast('Lagring feilet: ' + (err.message || String(err)), 'error');
     }
   }, 800);
 }
 
-// Firestore skyggekopi i db/backup — ratchet: oppdateres kun om data ikke synker
-const _fsBak = firebase.firestore().collection('db').doc('backup');
-async function _maybeUpdateFirestoreBackup(savedAt) {
-  try {
-    const bakSnap = await _fsBak.get();
-    const prevProjects = bakSnap.exists ? (bakSnap.data().projects || []).length : 0;
-    if (DB.projects.length >= prevProjects) {
-      await _fsBak.set({
-        customers: DB.customers, projects: DB.projects, tasks: DB.tasks,
-        notes: DB.notes, documents: DB.documents,
-        watchedCompanies: DB.watchedCompanies, creditAlerts: DB.creditAlerts,
-        _savedAt: savedAt,
-      });
-    }
-  } catch(e) {
-    console.warn('Backup-skriving feilet (ikke kritisk):', e.message);
-  }
-}
-
 /* ============================================================
-   LOKAL SNAPSHOT-BACKUP — sikkerhetsnett mot Firestore-tap
+   LOKAL SNAPSHOT-BACKUP — sikkerhetsnett mot datatap
    ============================================================ */
 const SNAPSHOTS_KEY = 'ess_local_snapshots';
 const MAX_SNAPSHOTS = 20;                          // økt fra 3 → 20
@@ -2026,34 +2009,8 @@ function _maybeSaveLocalSnapshot() {
   _writeSnapshots(snaps.slice(0, MAX_SNAPSHOTS));
 }
 
-async function restoreFromFirestoreBackup() {
-  try {
-    const bakSnap = await _fsBak.get();
-    if (!bakSnap.exists) { showToast('Ingen skyggekopi funnet', 'error'); return; }
-    const bak = bakSnap.data();
-    const projCount = (bak.projects || []).length;
-    if (projCount === 0) { showToast('Skyggekopien er tom — ingen data å gjenopprette', 'error'); return; }
-    confirmAction(
-      'Gjenopprette fra Firestore skyggekopi?',
-      `Skyggekopien fra ${fmtDate(bak._savedAt)} inneholder ${projCount} prosjekter og ${(bak.customers||[]).length} kunder. Dette overskriver gjeldende data.`,
-      async () => {
-        DB.customers        = bak.customers        || [];
-        DB.projects         = bak.projects         || [];
-        DB.tasks            = bak.tasks            || [];
-        DB.notes            = bak.notes            || [];
-        DB.documents        = bak.documents        || [];
-        DB.watchedCompanies = bak.watchedCompanies || [];
-        DB.creditAlerts     = bak.creditAlerts     || [];
-        _safeProjectCount  = DB.projects.length;
-        _safeCustomerCount = DB.customers.length;
-        persistAll({toast: `Gjenopprettet ${projCount} prosjekter fra skyggekopi`, allowShrink: true});
-        navigate('dashboard');
-      }
-    );
-  } catch(e) {
-    showToast('Kunne ikke lese skyggekopi: ' + e.message, 'error');
-  }
-}
+// Firestore skyggekopi er fjernet — data lever nå i Supabase PostgreSQL.
+// Bruk Supabase-dashbordet (supabase.com) for direkte DB-tilgang og backup.
 
 function restoreLocalSnapshot(index) {
   const snaps = _readSnapshots();
@@ -2061,7 +2018,7 @@ function restoreLocalSnapshot(index) {
   if (!snap) { showToast('Snapshot ikke funnet', 'error'); return; }
   confirmAction(
     'Gjenopprette fra lokal backup?',
-    `Snapshot fra ${fmtDate(snap.ts)} (${snap.sizeKB} KB). Dette overskriver alle data både lokalt og i Firestore.`,
+    `Snapshot fra ${fmtDate(snap.ts)} (${snap.sizeKB} KB). Dette overskriver alle data i Supabase med snapshot-innholdet.`,
     () => {
       try {
         const data = JSON.parse(snap.data);
@@ -2085,75 +2042,53 @@ function restoreLocalSnapshot(index) {
 
 async function loadAll() {
   try {
-    const snap = await _fsDoc.get();
-    if (snap.exists) {
-      const d = snap.data();
-      DB.customers        = d.customers        || [];
-      DB.projects         = d.projects         || [];
-      DB.tasks            = d.tasks            || [];
-      DB.notes            = d.notes            || [];
-      DB.activityLog      = d.activityLog      || [];
-      DB.documents        = d.documents        || [];
-      DB.watchedCompanies = d.watchedCompanies || [];
-      DB.creditAlerts     = d.creditAlerts     || [];
-      DB.config           = d.config           || { ingestToken: '', lastIngest: '' };
+    const [
+      { data: customers,  error: e1 },
+      { data: projects,   error: e2 },
+      { data: tasks,      error: e3 },
+      { data: notes,      error: e4 },
+      { data: documents,  error: e5 },
+      { data: actLog,     error: e6 },
+      { data: watched,    error: e7 },
+      { data: alerts,     error: e8 },
+      { data: cfgRow,     error: e9 },
+    ] = await Promise.all([
+      _supabase.from('customers').select('data'),
+      _supabase.from('projects').select('data'),
+      _supabase.from('tasks').select('data'),
+      _supabase.from('notes').select('data'),
+      _supabase.from('documents').select('data'),
+      _supabase.from('activity_log').select('data').order('ts', { ascending: true }),
+      _supabase.from('watched_companies').select('data'),
+      _supabase.from('credit_alerts').select('data'),
+      _supabase.from('config').select('*').eq('id', 1).maybeSingle(),
+    ]);
 
-      // Hvis hoveddokumentet har 0 prosjekter, sjekk skyggekopien
-      if (DB.projects.length === 0) {
-        try {
-          const bakSnap = await _fsBak.get();
-          if (bakSnap.exists) {
-            const bak = bakSnap.data();
-            const bakProjects = bak.projects || [];
-            if (bakProjects.length > 0) {
-              console.warn(`loadAll: hoveddok har 0 prosjekter, backup har ${bakProjects.length}. Gjenoppretter automatisk.`);
-              DB.customers        = bak.customers        || DB.customers;
-              DB.projects         = bakProjects;
-              DB.tasks            = bak.tasks            || DB.tasks;
-              DB.notes            = bak.notes            || DB.notes;
-              DB.documents        = bak.documents        || DB.documents;
-              DB.watchedCompanies = bak.watchedCompanies || DB.watchedCompanies;
-              DB.creditAlerts     = bak.creditAlerts     || DB.creditAlerts;
-              showToast('⚠️ Gjenopprettet fra skyggekopi — hoveddokument var tomt', 'info');
-              // Skriv tilbake til hoveddokumentet (men ikke til backup for å unngå løkke)
-              persistAll({ toast: 'Data gjenopprettet og lagret', allowShrink: true });
-            }
-          }
-        } catch(bakErr) {
-          console.warn('Backup-lesing feilet:', bakErr.message);
-        }
-      }
-    }
-    // else: første gang — tomt DB, vis demodata
+    const firstErr = e1||e2||e3||e4||e5||e6||e7||e8||e9;
+    if (firstErr) throw firstErr;
 
-    // Oppdater sikker-telling og ta snapshot umiddelbart etter vellykket lasting
+    DB.customers        = (customers  || []).map(r => r.data);
+    DB.projects         = (projects   || []).map(r => r.data);
+    DB.tasks            = (tasks      || []).map(r => r.data);
+    DB.notes            = (notes      || []).map(r => r.data);
+    DB.documents        = (documents  || []).map(r => r.data);
+    DB.activityLog      = (actLog     || []).map(r => r.data);
+    DB.watchedCompanies = (watched    || []).map(r => r.data);
+    DB.creditAlerts     = (alerts     || []).map(r => r.data);
+    DB.config           = cfgRow ? {
+      ingestToken: cfgRow.ingest_token || '',
+      lastIngest:  cfgRow.last_ingest  || '',
+      scraperLog:  cfgRow.scraper_log  || [],
+    } : { ingestToken: '', lastIngest: '', scraperLog: [] };
+
     _safeProjectCount  = DB.projects.length;
     _safeCustomerCount = DB.customers.length;
-    _maybeSaveLocalSnapshot();   // ta snapshot med én gang (ikke vent 2 min)
+    _maybeSaveLocalSnapshot();
 
   } catch(err) {
-    console.error('Firestore read error:', err);
-    showToast('Kunne ikke laste data: ' + _firestoreErrorMsg(err), 'error');
-  }
-}
-
-// Oversetter Firestore-feilkoder til norske, handlingsorienterte meldinger.
-// Faller tilbake til "sjekk internett" for ukjente koder.
-function _firestoreErrorMsg(err) {
-  const code = err?.code || '';
-  switch (code) {
-    case 'permission-denied':
-    case 'unauthenticated':
-      return 'du er logget ut — last siden på nytt for å logge inn igjen';
-    case 'resource-exhausted':
-      return 'datamengden har nådd grensen — eksporter og arkiver gamle prosjekter';
-    case 'deadline-exceeded':
-    case 'unavailable':
-      return 'Firestore svarer ikke — prøv igjen om litt';
-    case 'invalid-argument':
-      return 'ugyldig data — sjekk konsollen for detaljer';
-    default:
-      return code ? `${code} — sjekk internett` : 'sjekk internett';
+    console.error('Supabase read error:', err);
+    const msg = err?.message || String(err);
+    showToast('Kunne ikke laste data: ' + (msg.includes('JWT') ? 'du er logget ut — last siden på nytt' : msg), 'error');
   }
 }
 
@@ -6444,9 +6379,11 @@ function runScraperProtocol() {
       return;
     }
     try {
-      const snap = await _fsDoc.get();
-      const data = snap.data() || {};
-      if (data.config?.lastIngest !== prevIngest || (data.creditAlerts||[]).length !== prevCount) {
+      const [{ data: cfg }, { count }] = await Promise.all([
+        _supabase.from('config').select('last_ingest').eq('id', 1).maybeSingle(),
+        _supabase.from('credit_alerts').select('*', { count: 'exact', head: true }),
+      ]);
+      if ((cfg?.last_ingest || '') !== (prevIngest || '') || (count || 0) !== prevCount) {
         clearInterval(_scraperPollInterval); _scraperPollInterval = null;
         await loadAll();
         if (APP.view === 'anmerkninger') render();
@@ -6643,9 +6580,9 @@ function renderSettings() {
     <div class="section-title mb-12" style="margin-bottom:16px">Sikkerhetskopier & gjenoppretting</div>
     <div class="settings-grid">
       <div class="settings-card">
-        <h3>☁️ Firestore skyggekopi</h3>
-        <p>Automatisk backup i <code>db/backup</code>. Oppdateres kun når data øker — aldri ved tap. Gjenopprett om hoveddatabasen er skadet.</p>
-        <button class="btn btn-secondary w-full" onclick="restoreFromFirestoreBackup()">↻ Gjenopprett fra skyggekopi</button>
+        <h3>☁️ Supabase-database</h3>
+        <p>Data lagres i Supabase PostgreSQL. Åpne dashbordet for å se, redigere eller ta backup direkte i databasen.</p>
+        <a class="btn btn-secondary w-full" href="https://supabase.com/dashboard/project/qnhdtdctxhltiwofmjmj" target="_blank" rel="noopener">🔗 Åpne Supabase-dashboard</a>
       </div>
       <div class="settings-card">
         <h3>💾 Eksporter JSON-backup</h3>
@@ -6677,7 +6614,7 @@ function renderSettings() {
       <div class="section-title mb-12" style="margin-bottom:16px">Lokale snapshot-backups (denne nettleseren)</div>
       <div class="card"><div class="card-body">
         <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:8px">
-          Lagres automatisk i nettleseren (maks ${MAX_SNAPSHOTS}, hvert ${MIN_SNAPSHOT_INTERVAL_MS/60000}. min + ved oppstart). Sikkerhetsnett — bruk hvis Firestore-data går tapt.
+          Lagres automatisk i nettleseren (maks ${MAX_SNAPSHOTS}, hvert ${MIN_SNAPSHOT_INTERVAL_MS/60000}. min + ved oppstart). Sikkerhetsnett — bruk hvis Supabase-data skulle gå tapt.
         </div>
         ${rows}
       </div></div>
@@ -6917,9 +6854,9 @@ function showIngestDocs() {
       <p><strong>Engangsoppsett i Netlify (Site settings → Environment variables):</strong></p>
       <ol style="padding-left:20px">
         <li><code>INGEST_TOKEN</code> — generer en lang tilfeldig streng (f.eks. <code>openssl rand -hex 32</code>). Dette er din shared secret.</li>
-        <li><code>GOOGLE_APPLICATION_CREDENTIALS_JSON</code> — gå til Firebase Console → Project Settings → Service Accounts → «Generate new private key». Lim hele JSON-innholdet inn som verdi.</li>
+        <li><code>SUPABASE_SERVICE_ROLE_KEY</code> — gå til Supabase Dashboard → Project Settings → API → «service_role secret». Legg inn som Netlify-miljøvariabel.</li>
       </ol>
-      <p>Etter første deploy installerer Netlify <code>firebase-admin</code> automatisk fra <code>package.json</code>.</p>
+      <p>Etter første deploy installerer Netlify <code>@supabase/supabase-js</code> automatisk fra <code>package.json</code>.</p>
 
       <p style="margin-top:12px"><strong>Eksempel — curl:</strong></p>
       <pre style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;overflow:auto">curl -X POST https://&lt;ditt-site&gt;.netlify.app/.netlify/functions/anmerkninger-ingest \\
@@ -8475,9 +8412,15 @@ function confirmDelete(type, id) {
   })();
 
   confirmAction(`Slette ${labels[type]||type}?`, detailMsg,
-    () => {
+    async () => {
+      // Samle IDer som skal slettes fra Supabase FØR vi filtrerer arrays
+      const delOps = [];
       if (type === 'customer') {
         const projIds = DB.projects.filter(p => p.customerId === id).map(p => p.id);
+        const taskIds = DB.tasks.filter(t => projIds.includes(t.projectId)).map(t => t.id);
+        const noteIds = DB.notes.filter(n => projIds.includes(n.projectId)).map(n => n.id);
+        const logIds  = DB.activityLog.filter(e => projIds.includes(e.projectId)).map(e => e.id);
+        const docIds  = DB.documents.filter(d => projIds.includes(d.projectId)).map(d => d.id);
         DB.tasks        = DB.tasks.filter(t => !projIds.includes(t.projectId));
         DB.notes        = DB.notes.filter(n => !projIds.includes(n.projectId));
         DB.activityLog  = DB.activityLog.filter(e => !projIds.includes(e.projectId));
@@ -8487,25 +8430,46 @@ function confirmDelete(type, id) {
         // Fjern customerId-kobling fra watched (ikke selve raden — de er separate)
         DB.watchedCompanies.forEach(w => { if (w.customerId === id) delete w.customerId; });
         if (APP.customerDetailId === id) navigate('customers');
+        if (taskIds.length) delOps.push(_supabase.from('tasks').delete().in('id', taskIds));
+        if (noteIds.length) delOps.push(_supabase.from('notes').delete().in('id', noteIds));
+        if (logIds.length)  delOps.push(_supabase.from('activity_log').delete().in('id', logIds));
+        if (docIds.length)  delOps.push(_supabase.from('documents').delete().in('id', docIds));
+        if (projIds.length) delOps.push(_supabase.from('projects').delete().in('id', projIds));
+        delOps.push(_supabase.from('customers').delete().eq('id', id));
       } else if (type === 'project') {
+        const taskIds = DB.tasks.filter(t => t.projectId === id).map(t => t.id);
+        const noteIds = DB.notes.filter(n => n.projectId === id).map(n => n.id);
+        const logIds  = DB.activityLog.filter(e => e.projectId === id).map(e => e.id);
+        const docIds  = DB.documents.filter(d => d.projectId === id).map(d => d.id);
         DB.tasks        = DB.tasks.filter(t => t.projectId !== id);
         DB.notes        = DB.notes.filter(n => n.projectId !== id);
         DB.activityLog  = DB.activityLog.filter(e => e.projectId !== id);
         DB.documents    = DB.documents.filter(d => d.projectId !== id);
         DB.projects     = DB.projects.filter(p => p.id !== id);
         if (APP.projectDetailId === id) navigate('projects');
+        if (taskIds.length) delOps.push(_supabase.from('tasks').delete().in('id', taskIds));
+        if (noteIds.length) delOps.push(_supabase.from('notes').delete().in('id', noteIds));
+        if (logIds.length)  delOps.push(_supabase.from('activity_log').delete().in('id', logIds));
+        if (docIds.length)  delOps.push(_supabase.from('documents').delete().in('id', docIds));
+        delOps.push(_supabase.from('projects').delete().eq('id', id));
       } else if (type === 'task') {
         DB.tasks = DB.tasks.filter(t => t.id !== id);
+        delOps.push(_supabase.from('tasks').delete().eq('id', id));
       } else if (type === 'watched') {
         const norm = normalizeOrgNr(id);
-        DB.watchedCompanies = DB.watchedCompanies.filter(w => normalizeOrgNr(w.orgNr) !== norm);
+        const w = DB.watchedCompanies.find(x => normalizeOrgNr(x.orgNr) === norm);
+        DB.watchedCompanies = DB.watchedCompanies.filter(x => normalizeOrgNr(x.orgNr) !== norm);
+        if (w) delOps.push(_supabase.from('watched_companies').delete().eq('org_nr', w.orgNr || id));
         closeModal();
       } else if (type === 'alert') {
         DB.creditAlerts = DB.creditAlerts.filter(a => a.id !== id);
+        delOps.push(_supabase.from('credit_alerts').delete().eq('id', id));
       }
       // allowShrink: true — sikkerhetsbremsene skal ikke stoppe bevisst sletting
       _safeProjectCount  = DB.projects.length;
       _safeCustomerCount = DB.customers.length;
+      // Kjør Supabase-sletting og persistAll parallelt (fire-and-forget for delete)
+      if (delOps.length) Promise.all(delOps).catch(e => console.error('Supabase delete feilet:', e));
       persistAll({toast: 'Slettet', allowShrink: true});
       render();
     }
@@ -8564,7 +8528,20 @@ function importData(event) {
   event.target.value = '';
 }
 
-function resetAllData() {
+async function resetAllData() {
+  // Slett alle rader fra Supabase-tabellene
+  try {
+    await Promise.all([
+      _supabase.from('customers').delete().gte('id', ''),
+      _supabase.from('projects').delete().gte('id', ''),
+      _supabase.from('tasks').delete().gte('id', ''),
+      _supabase.from('notes').delete().gte('id', ''),
+      _supabase.from('activity_log').delete().gte('id', ''),
+      _supabase.from('documents').delete().gte('id', ''),
+      _supabase.from('watched_companies').delete().gte('org_nr', ''),
+      _supabase.from('credit_alerts').delete().gte('id', ''),
+    ]);
+  } catch(e) { console.error('Nullstill delete feilet:', e); }
   DB = {
     customers: [], projects: [], tasks: [], notes: [],
     activityLog: [], documents: [],
@@ -8573,7 +8550,7 @@ function resetAllData() {
   };
   _safeProjectCount  = 0;
   _safeCustomerCount = 0;
-  persistAll({toast: 'Alle data nullstilt', allowShrink: true});
+  showToast('Alle data nullstilt', 'success');
   navigate('dashboard');
 }
 
@@ -9771,32 +9748,30 @@ ${timelineHtml}
    ============================================================ */
 async function doLogin() {
   const email = document.getElementById('login-email')?.value.trim();
-  const pass  = document.getElementById('login-pass')?.value;
   const btn   = document.getElementById('login-btn');
   const err   = document.getElementById('login-error');
+  const msg   = document.getElementById('login-magic-msg');
 
-  if (!email || !pass) { if (err) err.textContent = 'Fyll inn e-post og passord.'; return; }
-  if (btn)  { btn.disabled = true; btn.textContent = 'Logger inn…'; }
+  if (!email) { if (err) err.textContent = 'Skriv inn e-postadressen din.'; return; }
+  if (btn)  { btn.disabled = true; btn.textContent = 'Sender…'; }
   if (err)  err.textContent = '';
 
   try {
-    await _auth.signInWithEmailAndPassword(email, pass);
-    // onAuthStateChanged tar over herfra
+    const { error } = await _supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    if (error) throw error;
+    if (msg) msg.style.display = 'block';
+    if (btn) { btn.disabled = false; btn.textContent = 'Send innloggingslenke'; }
   } catch(e) {
-    const msgs = {
-      'auth/invalid-email':        'Ugyldig e-postadresse.',
-      'auth/user-not-found':       'Ingen bruker med denne e-posten.',
-      'auth/wrong-password':       'Feil passord.',
-      'auth/invalid-credential':   'Feil e-post eller passord.',
-      'auth/too-many-requests':    'For mange forsøk. Prøv igjen senere.',
-    };
-    if (err) err.textContent = msgs[e.code] || 'Innlogging feilet: ' + e.message;
-    if (btn) { btn.disabled = false; btn.textContent = 'Logg inn'; }
+    if (err) err.textContent = e.message || 'Innlogging feilet — prøv igjen.';
+    if (btn) { btn.disabled = false; btn.textContent = 'Send innloggingslenke'; }
   }
 }
 
-function doLogout() {
-  _auth.signOut();
+async function doLogout() {
+  await _supabase.auth.signOut();
 }
 
 async function initApp() {
@@ -9837,17 +9812,22 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Auth-tilstandslytter — styrer hele app-flyten
-_auth.onAuthStateChanged(async user => {
+let _appInitialized = false;
+_supabase.auth.onAuthStateChange(async (event, session) => {
   const loginScreen = document.getElementById('login-screen');
   const appShell    = document.getElementById('app-shell');
 
-  if (user) {
-    // Innlogget — skjul login, vis app
+  if (session?.user) {
+    // Innlogget — skjul login, vis app (én gang per side-last)
     if (loginScreen) loginScreen.style.display = 'none';
     if (appShell)    appShell.style.display     = 'flex';
-    await initApp();
+    if (!_appInitialized) {
+      _appInitialized = true;
+      await initApp();
+    }
   } else {
     // Ikke innlogget — skjul app, vis login
+    _appInitialized = false;
     const loader = document.getElementById('fb-loading');
     if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 400); }
     if (appShell)    appShell.style.display    = 'none';

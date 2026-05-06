@@ -1,15 +1,15 @@
 // POST /.netlify/functions/anmerkninger-ingest
 //
 // Tar imot betalingsanmerkninger fra ekstern automatisert tjeneste og merger
-// dem inn i Firestore-dokumentet db/main (samme dokument som klient-appen leser).
+// dem inn i Supabase-tabellen credit_alerts.
 //
 // Krav i Netlify miljøvariabler:
-//   INGEST_TOKEN                       — shared secret som klienten må sende i X-Ingest-Token
-//   GOOGLE_APPLICATION_CREDENTIALS_JSON — komplett service-account-JSON som streng
-//                                        (Firebase Console → Project Settings → Service Accounts)
-//   RESEND_API_KEY                     — API-nøkkel fra resend.com for utsending av e-postrapport
-//                                        (valgfri — e-post hoppes over hvis ikke satt)
-//                                        Krever at essc.no er verifisert som avsenderdomene i Resend.
+//   INGEST_TOKEN              — shared secret som klienten må sende i X-Ingest-Token
+//   SUPABASE_URL              — f.eks. https://qnhdtdctxhltiwofmjmj.supabase.co
+//   SUPABASE_SERVICE_ROLE_KEY — service_role-nøkkel (omgår RLS — bruk kun server-side)
+//   RESEND_API_KEY            — API-nøkkel fra resend.com for utsending av e-postrapport
+//                               (valgfri — e-post hoppes over hvis ikke satt)
+//                               Krever at essc.no er verifisert som avsenderdomene i Resend.
 //
 // Payload:
 //   { "alerts": [
@@ -19,21 +19,10 @@
 //       ...
 //   ] }
 //
-// Dedup: samme (orgNr, refNr, regDate) hoppes over.
+// Dedup: samme (org_nr, ref_nr, reg_date) hoppes over (UNIQUE-constraint i DB).
 // Respons: { added, skipped, total }
 
-const admin = require('firebase-admin');
-
-// Init én gang per kald-start (Netlify gjenbruker container ved varme kall).
-let _initDone = false;
-function initFirebase() {
-  if (_initDone) return;
-  const credsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  if (!credsJson) throw new Error('GOOGLE_APPLICATION_CREDENTIALS_JSON er ikke satt');
-  const creds = JSON.parse(credsJson);
-  admin.initializeApp({ credential: admin.credential.cert(creds) });
-  _initDone = true;
-}
+const { createClient } = require('@supabase/supabase-js');
 
 function normalizeOrgNr(s) {
   if (s === null || s === undefined) return '';
@@ -54,7 +43,7 @@ function jsonResponse(statusCode, body) {
   };
 }
 
-async function sendEmailReport(newAlerts, allAlerts, watchedCompanies) {
+async function sendEmailReport(newAlerts, totalAlerts, watchedCompanies) {
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey) return; // E-post ikke konfigurert — hopp over
 
@@ -63,8 +52,12 @@ async function sendEmailReport(newAlerts, allAlerts, watchedCompanies) {
   });
 
   const companyName = (orgNr) => {
-    const w = (watchedCompanies || []).find(c => normalizeOrgNr(c.orgNr) === orgNr);
-    return w?.name || orgNr;
+    const w = (watchedCompanies || []).find(r => {
+      const wData = r.data || r;
+      return normalizeOrgNr(wData.orgNr) === orgNr;
+    });
+    const wData = w ? (w.data || w) : null;
+    return wData?.name || orgNr;
   };
 
   const alertRows = newAlerts.length > 0
@@ -93,7 +86,7 @@ async function sendEmailReport(newAlerts, allAlerts, watchedCompanies) {
         <div style="font-size:12px;color:#666;margin-top:2px">Nye anmerkninger</div>
       </div>
       <div style="background:#f5f4f0;border-radius:6px;padding:12px 18px;flex:1;text-align:center">
-        <div style="font-size:28px;font-weight:700;color:#1B2A4A">${allAlerts.length}</div>
+        <div style="font-size:28px;font-weight:700;color:#1B2A4A">${totalAlerts}</div>
         <div style="font-size:12px;color:#666;margin-top:2px">Totalt i basen</div>
       </div>
     </div>
@@ -160,80 +153,98 @@ exports.handler = async (event) => {
     return jsonResponse(400, { error: 'Forventet { alerts: [...] }' });
   }
 
-  // Init Firebase Admin og hent dokumentet
-  try {
-    initFirebase();
-  } catch (e) {
-    return jsonResponse(500, { error: 'Firebase init feilet: ' + e.message });
+  // Init Supabase med service_role (omgår RLS)
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) {
+    return jsonResponse(500, { error: 'SUPABASE_URL eller SUPABASE_SERVICE_ROLE_KEY er ikke satt' });
   }
-  const db   = admin.firestore();
-  const ref  = db.collection('db').doc('main');
-  const snap = await ref.get();
-  const data = snap.exists ? snap.data() : {};
-  const existing         = Array.isArray(data.creditAlerts)  ? data.creditAlerts  : [];
-  const watchedCompanies = Array.isArray(data.watchedCompanies) ? data.watchedCompanies : [];
-
-  // Dedup-set (orgNr|refNr|regDate)
-  const seen = new Set(existing.map(a => `${normalizeOrgNr(a.orgNr)}|${a.refNr || ''}|${a.regDate || ''}`));
+  const supabase = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false },
+  });
 
   const ingestedAt = new Date().toISOString();
-  const newAlerts = [];
+
+  // Bygg de nye radene — la Supabase-unikt-constraint håndtere dedup
+  const newRows = [];
   let skipped = 0;
   for (const raw of incoming) {
-    const orgNr = normalizeOrgNr(raw.orgNr || raw.orgnr);
+    const orgNr   = normalizeOrgNr(raw.orgNr || raw.orgnr);
     const regDate = String(raw.regDate || raw.dato || '').slice(0, 10);
-    const refNr = String(raw.refNr || raw.referansenr || '').trim();
+    const refNr   = String(raw.refNr || raw.referansenr || '').trim();
     if (!orgNr || !regDate) { skipped++; continue; }
-    const key = `${orgNr}|${refNr}|${regDate}`;
-    if (seen.has(key)) { skipped++; continue; }
-    seen.add(key);
-    newAlerts.push({
-      id:       uid(),
-      orgNr,
-      regDate,
-      type:     String(raw.type || '').trim(),
-      amount:   Number(raw.amount || raw.belop || raw.beløp) || 0,
-      source:   String(raw.source || raw.kilde || '').trim(),
-      refNr,
-      status:   String(raw.status || '').trim(),
-      creditor: String(raw.creditor || raw.kreditor || '').trim(),
-      ingestedAt,
+    newRows.push({
+      id:          uid(),
+      org_nr:      orgNr,
+      reg_date:    regDate,
+      ref_nr:      refNr,
+      ingested_at: ingestedAt,
+      data: {
+        id:          uid(),   // app-side id (overskrives nedenfor)
+        orgNr,
+        regDate,
+        type:     String(raw.type || '').trim(),
+        amount:   Number(raw.amount || raw.belop || raw.beløp) || 0,
+        source:   String(raw.source || raw.kilde || '').trim(),
+        refNr,
+        status:   String(raw.status || '').trim(),
+        creditor: String(raw.creditor || raw.kreditor || '').trim(),
+        ingestedAt,
+      },
     });
   }
 
-  const allAlerts = newAlerts.length ? [...existing, ...newAlerts] : existing;
+  // Sett samme ID i data.id som rad-IDen
+  newRows.forEach(r => { r.data.id = r.id; });
 
-  // Oppdater scraperLog (maks 50 entries)
-  const existingLog = Array.isArray(data.config?.scraperLog) ? data.config.scraperLog : [];
+  // Upsert med onConflict — duplikater hoppes over stille
+  let added = 0;
+  if (newRows.length > 0) {
+    const { data: upserted, error } = await supabase
+      .from('credit_alerts')
+      .upsert(newRows, { onConflict: 'org_nr,ref_nr,reg_date', ignoreDuplicates: true })
+      .select('id');
+    if (error) return jsonResponse(500, { error: 'Supabase upsert feilet: ' + error.message });
+    added   = (upserted || []).length;
+    skipped += newRows.length - added;
+  }
+
+  // Hent totalt antall for log + e-post
+  const { count: totalAlerts } = await supabase
+    .from('credit_alerts')
+    .select('*', { count: 'exact', head: true });
+
+  // Oppdater config: lastIngest og scraperLog (maks 50 entries)
+  const { data: cfgRow } = await supabase
+    .from('config')
+    .select('scraper_log')
+    .eq('id', 1)
+    .maybeSingle();
+
+  const existingLog = Array.isArray(cfgRow?.scraper_log) ? cfgRow.scraper_log : [];
   const logEntry = {
     ts:          ingestedAt,
-    added:       newAlerts.length,
+    added,
     skipped,
     total:       incoming.length,
-    totalAlerts: allAlerts.length,
+    totalAlerts: totalAlerts || 0,
   };
   const updatedLog = [...existingLog, logEntry].slice(-50);
 
-  const updatePayload = {
-    _savedAt:              ingestedAt,
-    'config.lastIngest':   ingestedAt,
-    'config.scraperLog':   updatedLog,
-  };
-  if (newAlerts.length) {
-    updatePayload.creditAlerts = allAlerts;
-  }
-  await ref.update(updatePayload);
+  await supabase
+    .from('config')
+    .update({ last_ingest: ingestedAt, scraper_log: updatedLog })
+    .eq('id', 1);
 
   // Send e-postrapport (feiler stille hvis RESEND_API_KEY ikke er satt)
   try {
-    await sendEmailReport(newAlerts, allAlerts, watchedCompanies);
+    const newAlerts = newRows.slice(0, added).map(r => r.data);
+    // Hent watchedCompanies for selskapsnavn i e-post
+    const { data: watched } = await supabase.from('watched_companies').select('data');
+    await sendEmailReport(newAlerts, totalAlerts || 0, watched || []);
   } catch (e) {
     console.error('E-postutsending feilet:', e.message);
   }
 
-  return jsonResponse(200, {
-    added:   newAlerts.length,
-    skipped,
-    total:   incoming.length,
-  });
+  return jsonResponse(200, { added, skipped, total: incoming.length });
 };

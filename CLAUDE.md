@@ -12,13 +12,13 @@ Ingen byggsteg, ingen npm, ingen bundler. Åpne filen i nettleser for lokal test
 
 ```
 ess-consulting/
-├── index.html                      ← hele appen (~8500+ linjer)
+├── index.html                      ← hele appen (~9600+ linjer)
 ├── netlify.toml                    ← Netlify-konfig (functions-mappe)
-├── package.json                    ← npm-deps for functions (firebase-admin)
+├── package.json                    ← npm-deps for functions (@supabase/supabase-js)
 ├── netlify/
 │   └── functions/
 │       ├── ai.js                   ← Anthropic API-proxy
-│       └── anmerkninger-ingest.js  ← betalingsanmerkninger-ingest (Firebase Admin)
+│       └── anmerkninger-ingest.js  ← betalingsanmerkninger-ingest (Supabase)
 └── CLAUDE.md                       ← denne filen
 ```
 
@@ -28,33 +28,54 @@ ess-consulting/
 |---|---|---|
 | `ANTHROPIC_API_KEY` | `ai.js` | Claude API-nøkkel |
 | `INGEST_TOKEN` | `anmerkninger-ingest.js` | Shared secret for innsending av betalingsanmerkninger |
-| `GOOGLE_APPLICATION_CREDENTIALS_JSON` | `anmerkninger-ingest.js` | Komplett service-account-JSON fra Firebase Console (Project Settings → Service Accounts) |
+| `SUPABASE_URL` | `anmerkninger-ingest.js` | Supabase prosjekt-URL (f.eks. `https://qnhdtdctxhltiwofmjmj.supabase.co`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | `anmerkninger-ingest.js` | Service role-nøkkel (omgår RLS — kun server-side) |
 | `RESEND_API_KEY` | `anmerkninger-ingest.js` | API-nøkkel fra resend.com — sender ukentlig e-postrapport til erlend/sondre/kenneth. Krever at `essc.no` er verifisert som avsenderdomene i Resend-dashbordet. Valgfri — e-post hoppes over hvis ikke satt. |
 
 **Hosting:** Netlify (auto-deploy fra GitHub `main`-branch)
-**Database:** Google Firebase Firestore (compat SDK v10.12.0)
+**Database:** Supabase PostgreSQL (prosjekt: `qnhdtdctxhltiwofmjmj`)
+**Auth:** Supabase Auth — magic link (OTP e-post), ingen passord
 **AI:** Anthropic Claude via Netlify Function-proxy (`/.netlify/functions/ai`)
 **Styling:** Tailwind CSS via CDN + egne CSS-variabler
 
 ---
 
-## Firebase-konfigurasjon
+## Supabase-konfigurasjon
 
 ```javascript
-firebase.initializeApp({
-  apiKey:            "AIzaSyC...",          // ikke endre
-  authDomain:        "essc-246a1.firebaseapp.com",
-  projectId:         "essc-246a1",
-  storageBucket:     "essc-246a1.firebasestorage.app",
-  appId:             "1:210538892469:web:d0a0b534f8e6f8571042fc"
-});
-const _fsDoc = firebase.firestore().collection('db').doc('main');
-const _auth  = firebase.auth();
+const _supabase = supabase.createClient(
+  'https://qnhdtdctxhltiwofmjmj.supabase.co',
+  'sb_publishable_zo52TmhPZaHScF2-YC9V6w_luE8LUDq'  // anon/publishable key
+);
 ```
 
-**VIKTIG:** Alt data lagres i ett enkelt Firestore-dokument (`db/main`).
-Bruker Firebase compat SDK — **ikke** modular (ES modules) syntax.
-Rett: `firebase.firestore()` — Feil: `import { getFirestore } from 'firebase/firestore'`
+**Auth:** Magic link via `_supabase.auth.signInWithOtp({ email })`.
+**RLS:** Alle tabeller har Row Level Security — policy: `auth.email() = 'erlend.sandberg@gmail.com'`.
+**Dashboard:** https://supabase.com/dashboard/project/qnhdtdctxhltiwofmjmj
+
+---
+
+## Database-skjema (Supabase PostgreSQL)
+
+Alle tabeller bruker JSONB-mønster: `{ id TEXT PRIMARY KEY, data JSONB NOT NULL }`.
+Dette minimerer kodeendringer — resten av appen jobber mot det samme JS-objektet (DB).
+
+```sql
+CREATE TABLE customers        (id TEXT PRIMARY KEY, data JSONB NOT NULL);
+CREATE TABLE projects         (id TEXT PRIMARY KEY, data JSONB NOT NULL);
+CREATE TABLE tasks            (id TEXT PRIMARY KEY, project_id TEXT, data JSONB NOT NULL);
+CREATE TABLE notes            (id TEXT PRIMARY KEY, project_id TEXT, data JSONB NOT NULL);
+CREATE TABLE documents        (id TEXT PRIMARY KEY, project_id TEXT, data JSONB NOT NULL);
+CREATE TABLE activity_log     (id TEXT PRIMARY KEY, ts TIMESTAMPTZ, data JSONB NOT NULL);
+CREATE TABLE watched_companies(org_nr TEXT PRIMARY KEY, data JSONB NOT NULL);
+CREATE TABLE credit_alerts    (
+  id TEXT PRIMARY KEY, org_nr TEXT NOT NULL, ref_nr TEXT NOT NULL DEFAULT '',
+  reg_date TEXT NOT NULL, data JSONB NOT NULL, ingested_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (org_nr, ref_nr, reg_date));
+CREATE TABLE config (
+  id INTEGER PRIMARY KEY DEFAULT 1, ingest_token TEXT DEFAULT '',
+  last_ingest TIMESTAMPTZ, scraper_log JSONB DEFAULT '[]');
+```
 
 ---
 
@@ -76,12 +97,9 @@ let DB = {
   watchedCompanies: [],  // { orgNr, name, contactPerson, email, phone, kommune, fylke,
                           //   naceCode, naceDesc, dagligLeder, styretsLeder, revisor,
                           //   sumSalgsinntekter, importedAt, customerId? }
-                          // Importeres fra Proff Forvalt-uttrekk (Excel) i Innstillinger.
-                          // Adskilt fra customers — kan være leads/leverandører/konkurrenter.
   creditAlerts:     [],  // { id, orgNr, regDate (YYYY-MM-DD), type, amount, source,
                           //   refNr, status, creditor, ingestedAt }
-                          // Importeres manuelt (Excel/CSV) eller via Netlify Function.
-                          // Match til kunde/overvåket selskap via normalizeOrgNr().
+  config:           { ingestToken: '', lastIngest: '' },
 };
 ```
 
@@ -96,13 +114,17 @@ let DB = {
 ## Persistens
 
 ```javascript
-function persistAll()       // debounce 800ms → skriver hele DB til Firestore
-async function loadAll()    // leser DB fra Firestore ved oppstart
+function persistAll()       // debounce 800ms → upsert alle endrede tabeller til Supabase
+async function loadAll()    // leser alle tabeller fra Supabase ved oppstart
 ```
 
-Firestore-reglene krever `request.auth != null` — brukeren må være innlogget.
+Supabase RLS krever gyldig sesjon — brukeren må være innlogget.
 Kall alltid `persistAll()` etter endringer i DB.
 Kall alltid `render()` etter endringer som skal vises.
+
+**Sletting:** `persistAll()` gjør kun upsert — sletter aldri rader.
+Ved sletting av objekter må du kalle Supabase DELETE eksplisitt
+(dette håndteres av `confirmDelete()` og `resetAllData()`).
 
 ---
 
@@ -205,8 +227,8 @@ let APP = {
 
 | Funksjon | Linje (ca.) | Beskrivelse |
 |---|---|---|
-| `persistAll()` | 1841 | Lagrer DB til Firestore (debounce 800ms) |
-| `loadAll()` | 1862 | Leser DB fra Firestore |
+| `persistAll()` | 1841 | Lagrer DB til Supabase (debounce 800ms, upsert) |
+| `loadAll()` | 1862 | Leser alle tabeller fra Supabase |
 | `navigate(view, extra)` | 1973 | Bytter visning |
 | `render()` | 2000 | Re-rendrer current view |
 | `renderDashboard()` | 2020 | Dashboard med KPI, varsler, Vera |
@@ -219,42 +241,33 @@ let APP = {
 | `renderCalendar()` | 3461 | Kalender med tidslinje |
 | `renderOkonomi()` | 3600 | Økonomirapport |
 | `renderSettings()` | 5563 | Innstillinger |
-| `openProjectModal(id, prefill)` | 5805 | Opprett/rediger prosjekt (støtter prefill-objekt og inline ny kunde) |
+| `openProjectModal(id, prefill)` | 5805 | Opprett/rediger prosjekt |
 | `saveProject(id)` | 5974 | Lagrer prosjekt fra modal |
 | `openCustomerModal(id)` | 5730 | Opprett/rediger kunde |
-| `toggleInlineNewCustomer()` | 5978 | Åpner inline ny-kunde-skjema i prosjektmodalen |
-| `saveInlineNewCustomer()` | 5986 | Lagrer ny kunde fra inline-skjema |
-| `openTaskModal(projectId, taskId)` | 6420 | Opprett/rediger oppgave |
 | `toggleTask(taskId)` | 6570 | Fullfør/gjenåpne oppgave + logger aktivitet |
 | `addNote(projectId)` | 6580 | Legg til notat + logger aktivitet |
 | `logActivity(type, projId, tekst)` | 6555 | Skriv til aktivitetslogg |
-| `getTodayLog()` | 6567 | Henter dagens loggposter |
-| `saveWorkNote(projectId)` | 6608 | Lagrer rask arbeidskommentar fra I dag-siden |
-| `openLoggHistorikk(dato, projId)` | 6792 | Åpner historikk-modal med datonavigasjon |
-| `openDagrapportModal()` | 6939 | Vera genererer dagrapport |
-| `exportDagrapportPDF(datoStr)` | 7034 | Eksporterer dagrapport som PDF |
 | `handleDocUpload(event, projId)` | 6618 | Laster opp dokument, ekstraherer tekst |
-| `aiSummarizeDoc(docId, projId)` | 6738 | AI-sammendrag av dokument → notat |
-| `deleteDoc(docId, projId)` | 6722 | Sletter dokument |
-| `openQuickEstimateModal()` | 4326 | Honorarestimering med BRREG-søk |
 | `runVera(force)` | 4882 | Vera dashboard-analyse |
 | `toggleVeraChat()` | 5017 | Vera chat-boble |
 | `generateOppdragsPDF(projectId)` | 5302 | PDF engasjementsbrev |
 | `callAI(prompt, tokens, system)` | 4002 | Kaller Anthropic API via proxy |
-| `confirmDelete(type, id)` | 7058 | Slett prosjekt/kunde/oppgave + rydder relatert data |
+| `confirmDelete(type, id)` | 7058 | Slett prosjekt/kunde/oppgave + Supabase DELETE |
+| `resetAllData()` | ~8528 | Slett alt — Supabase DELETE + nullstill DB |
 | `showToast(msg, type)` | 7198 | Toast-notifikasjon |
 | `confirmAction(title, msg, cb)` | 7180 | Bekreftelsesdialog |
 | `uid()` | 1884 | Genererer unik ID |
 | `now()` | 1893 | ISO-timestamp |
 | `escHtml(str)` | 1962 | XSS-sikring |
-| `_veraMarkdown(text)` | 5148 | Markdown → HTML (Vera-chat) |
-| `_noteMarkdown(text)` | 5159 | Markdown → HTML (prosjektnotater) |
+| `doLogin()` | ~9733 | Magic link OTP via Supabase Auth |
+| `doLogout()` | ~9759 | Logg ut via Supabase Auth |
 
 ---
 
 ## Sletting — viktig: rydd opp relaterte data
 
-Ved sletting av kunde eller prosjekt må **alle** relaterte data ryddes:
+Ved sletting av kunde eller prosjekt må **alle** relaterte data ryddes — både i DB-minnet
+og med eksplisitte Supabase DELETE-kall (håndteres av `confirmDelete()`).
 
 ```javascript
 // Prosjekt slettes:
@@ -263,29 +276,31 @@ DB.notes       = DB.notes.filter(n => n.projectId !== id);
 DB.activityLog = DB.activityLog.filter(e => e.projectId !== id);
 DB.documents   = DB.documents.filter(d => d.projectId !== id);
 DB.projects    = DB.projects.filter(p => p.id !== id);
+// + Supabase DELETE for tasks, notes, activity_log, documents, projects
 
 // Kunde slettes (finn prosjekt-IDer først):
 const projIds = DB.projects.filter(p => p.customerId === id).map(p => p.id);
-DB.tasks       = DB.tasks.filter(t => !projIds.includes(t.projectId));
-DB.notes       = DB.notes.filter(n => !projIds.includes(n.projectId));
-DB.activityLog = DB.activityLog.filter(e => !projIds.includes(e.projectId));
-DB.documents   = DB.documents.filter(d => !projIds.includes(d.projectId));
-DB.projects    = DB.projects.filter(p => p.customerId !== id);
-DB.customers   = DB.customers.filter(c => c.id !== id);
+// + filter alle relaterte arrays
+// + Supabase DELETE for alle relaterte tabeller + customers
 ```
 
 ---
 
-## Datavern og migrering
+## Datavern og datasikkerhet
 
-**All data lever i Firestore** — ikke i `localStorage` eller nettleseren.
-Det betyr at:
+**All data lever i Supabase PostgreSQL** — ikke i `localStorage` eller nettleseren.
 - Data overlever enhver endring av `index.html`
 - Ny deployment endrer ikke data
 - Å åpne appen i ny nettleser gir samme data (så lenge man er innlogget)
 - Det er **trygt å erstatte `index.html`** uten å miste noe
 
-For å eksportere/ta backup av data: Innstillinger → Eksporter JSON.
+**Lokale snapshots:** Automatisk backup i `localStorage` hvert 2. minutt (maks 20 snapshots).
+Gjenopprettbar fra Innstillinger → Lokale snapshot-backups.
+
+**Manuell backup:** Innstillinger → Eksporter JSON.
+
+**Sikkerhetsbrems:** `_safeProjectCount` / `_safeCustomerCount` forhindrer at `persistAll()`
+skriver til Supabase hvis antall prosjekter/kunder plutselig faller uventet.
 
 ---
 
@@ -300,12 +315,11 @@ npm install -g netlify-cli
 netlify dev
 ```
 
-**Merk:** Firebase kobler til prod-databasen uansett miljø.
+**Merk:** Supabase kobler til prod-databasen uansett miljø.
 Det finnes ingen separat dev-database. Vær forsiktig med testdata.
 
 ### Syntakssjekk
 ```bash
-# Trekk ut script-blokken og sjekk med node:
 python3 -c "
 import re, sys
 content = open('index.html').read()
@@ -328,7 +342,8 @@ git push
 Miljøvariabler som må være satt i Netlify → Site settings → Environment variables:
 - `ANTHROPIC_API_KEY` (Claude API)
 - `INGEST_TOKEN` (shared secret for anmerkninger-ingest)
-- `GOOGLE_APPLICATION_CREDENTIALS_JSON` (Firebase Admin service account)
+- `SUPABASE_URL` (Supabase prosjekt-URL)
+- `SUPABASE_SERVICE_ROLE_KEY` (service role-nøkkel for server-side DB-tilgang)
 
 ---
 
@@ -336,7 +351,7 @@ Miljøvariabler som må være satt i Netlify → Site settings → Environment v
 
 | Bibliotek | URL | Brukes til |
 |---|---|---|
-| Firebase compat 10.12.0 | gstatic.com | Database og auth (alltid lastet) |
+| Supabase JS v2 | cdn.jsdelivr.net | Database og auth (alltid lastet) |
 | jsPDF 2.5.1 | cdnjs | PDF-generering (engasjementsbrev, dagrapport) |
 | pdf.js 3.11.174 | cdnjs | Tekstekstraksjon fra PDF-opplastinger |
 | mammoth 1.6.0 | cdnjs | Tekstekstraksjon fra DOCX-opplastinger |
@@ -346,7 +361,7 @@ Miljøvariabler som må være satt i Netlify → Site settings → Environment v
 
 ## Kjente begrensninger
 
-- Firestore-dokumentet (`db/main`) har en grense på 1MB. Aktivitetsloggen og dokumenttekster kan vokse over tid — dersom appen begynner å feile ved lagring er dette sannsynlig årsak. Løsning: del opp i separate Firestore-dokumenter.
 - Dokumentopplasting leser tekst lokalt — selve filen lagres ikke, kun ekstrahert tekst (maks 80k tegn).
 - PDF-lesing fungerer ikke for skannede dokumenter (bilder i PDF).
-- Ingen separat testdatabase — all utvikling skjer mot prod-Firestore.
+- Ingen separat testdatabase — all utvikling skjer mot prod-Supabase.
+- `ignoreDuplicates: true` i credit_alerts upsert: Supabase returnerer kun de faktisk innsatte radene, ikke de som ble hoppet over.
