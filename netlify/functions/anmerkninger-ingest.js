@@ -5,7 +5,7 @@
 //
 // Krav i Netlify miljøvariabler:
 //   INGEST_TOKEN              — shared secret som klienten må sende i X-Ingest-Token
-//   SUPABASE_URL              — f.eks. https://qnhdtdctxhltiwofmjmj.supabase.co
+//   SUPABASE_URL              — f.eks. https://<project-id>.supabase.co
 //   SUPABASE_SERVICE_ROLE_KEY — service_role-nøkkel (omgår RLS — bruk kun server-side)
 //   RESEND_API_KEY            — API-nøkkel fra resend.com for utsending av e-postrapport
 //                               (valgfri — e-post hoppes over hvis ikke satt)
