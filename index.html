@@ -2258,6 +2258,16 @@ function escHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Enkel markdown → HTML (brukes for AI-estimater og Vera-svar)
+function renderMd(t) {
+  if (!t) return '';
+  return escHtml(t)
+    .replace(/^#{1,3} (.+)$/gm, '<strong style="display:block;margin-top:6px">$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^[-*] /gm, '&nbsp;&nbsp;· ')
+    .replace(/\n/g, '<br>');
+}
+
 function getCustomer(id) { return DB.customers.find(c => c.id === id); }
 function getProject(id)  { return DB.projects.find(p => p.id === id); }
 
@@ -3403,7 +3413,7 @@ function renderProjectDetail(id) {
       </div>
       <button class="btn btn-primary btn-sm" id="ai-est-btn-${p.id}"
         onclick="generateProjectEstimate('${p.id}')">${_ICON_AI} Generer prisestimat</button>
-      <div id="ai-est-result-${p.id}" style="display:none;margin-top:12px;background:var(--navy-light);border-radius:8px;padding:14px;color:#fff;font-size:13px;line-height:1.7;white-space:pre-wrap"></div>
+      <div id="ai-est-result-${p.id}" style="display:none;margin-top:12px;background:var(--navy-light);border-radius:8px;padding:14px;color:#fff;font-size:13px;line-height:1.7"></div>
 
       ${(p.aiEstimates && p.aiEstimates.length > 0) ? `
       <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
@@ -3415,7 +3425,7 @@ function renderProjectDetail(id) {
             ${i===0 ? '<span style="font-size:10px;background:var(--blue-pale);color:var(--blue);border-radius:4px;padding:1px 7px;font-weight:600">Siste</span>' : ''}
           </div>
           ${e.description ? `<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px;font-style:italic">"${escHtml(e.description.slice(0,120))}${e.description.length>120?'…':''}"</div>` : ''}
-          <div style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.6">${escHtml(e.result)}</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">${renderMd(e.result)}</div>
         </div>`).join('')}
       </div>` : ''}
     </div>
@@ -4610,7 +4620,7 @@ Vær konkret og realistisk for norsk SMB-rådgivningsmarked. Ikke McKinsey-nivå
 
   try {
     const text = await callAI(prompt, 600);
-    if (resEl) { resEl.textContent = text; }
+    if (resEl) { resEl.innerHTML = renderMd(text); }
 
     // Lagre i estimathistorikk
     if (!p.aiEstimates) p.aiEstimates = [];
