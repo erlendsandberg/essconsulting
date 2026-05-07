@@ -1715,11 +1715,11 @@ tr:hover td { background: #FAFAFA; }
     <div class="login-sub">Prosjektstyring · Logg inn for å fortsette</div>
     <label class="login-label">E-post</label>
     <input class="login-input" id="login-email" type="email" placeholder="din@epost.no"
-      autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="login-btn" id="login-btn" onclick="doLogin()">Send innloggingslenke</button>
-    <div id="login-magic-msg" style="display:none;margin-top:14px;padding:12px 16px;background:rgba(255,255,255,0.12);border-radius:8px;font-size:13px;color:rgba(255,255,255,0.9);text-align:center;line-height:1.5">
-      ✉️ Sjekk innboksen din — klikk lenken i e-posten for å logge inn
-    </div>
+      autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+    <label class="login-label" style="margin-top:14px">Passord</label>
+    <input class="login-input" id="login-pass" type="password" placeholder="••••••••"
+      autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Logg inn</button>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
@@ -9749,25 +9749,25 @@ ${timelineHtml}
    ============================================================ */
 async function doLogin() {
   const email = document.getElementById('login-email')?.value.trim();
+  const pass  = document.getElementById('login-pass')?.value;
   const btn   = document.getElementById('login-btn');
   const err   = document.getElementById('login-error');
-  const msg   = document.getElementById('login-magic-msg');
 
-  if (!email) { if (err) err.textContent = 'Skriv inn e-postadressen din.'; return; }
-  if (btn)  { btn.disabled = true; btn.textContent = 'Sender…'; }
-  if (err)  err.textContent = '';
+  if (!email || !pass) { if (err) err.textContent = 'Fyll inn e-post og passord.'; return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Logger inn…'; }
+  if (err) err.textContent = '';
 
   try {
-    const { error } = await _supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    });
+    const { error } = await _supabase.auth.signInWithPassword({ email, password: pass });
     if (error) throw error;
-    if (msg) msg.style.display = 'block';
-    if (btn) { btn.disabled = false; btn.textContent = 'Send innloggingslenke'; }
+    // onAuthStateChange tar over herfra
   } catch(e) {
-    if (err) err.textContent = e.message || 'Innlogging feilet — prøv igjen.';
-    if (btn) { btn.disabled = false; btn.textContent = 'Send innloggingslenke'; }
+    const msgs = {
+      'Invalid login credentials': 'Feil e-post eller passord.',
+      'Email not confirmed':       'E-posten er ikke bekreftet.',
+    };
+    if (err) err.textContent = msgs[e.message] || e.message || 'Innlogging feilet.';
+    if (btn) { btn.disabled = false; btn.textContent = 'Logg inn'; }
   }
 }
 
