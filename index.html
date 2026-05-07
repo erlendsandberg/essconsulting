@@ -1889,7 +1889,7 @@ let DB = {
   // { id, orgNr, regDate (YYYY-MM-DD), type, amount, source, refNr, status, creditor, ingestedAt }
   creditAlerts:     [],
   // App-konfigurasjon: ingestToken (bruker setter én gang), lastIngest (satt av ingest-API)
-  config:           { ingestToken: '', lastIngest: '' },
+  config:           { ingestToken: '', lastIngest: '', aiKalibrering: '' },
 };
 
 // Maks antall aktivitetslogg-entries vi beholder.
@@ -1967,9 +1967,10 @@ function persistAll(opts = {}) {
         ));
       ops.push(_supabase.from('config').upsert({
         id: 1,
-        ingest_token: DB.config?.ingestToken || '',
-        last_ingest:  DB.config?.lastIngest  || null,
-        scraper_log:  DB.config?.scraperLog  || [],
+        ingest_token:    DB.config?.ingestToken   || '',
+        last_ingest:     DB.config?.lastIngest     || null,
+        scraper_log:     DB.config?.scraperLog     || [],
+        ai_kalibrering:  DB.config?.aiKalibrering  || '',
       }));
 
       const results = await Promise.all(ops);
@@ -2043,7 +2044,7 @@ function restoreLocalSnapshot(index) {
         DB.documents        = data.documents        || [];
         DB.watchedCompanies = data.watchedCompanies || [];
         DB.creditAlerts     = data.creditAlerts     || [];
-        DB.config           = data.config           || { ingestToken: '', lastIngest: '' };
+        DB.config           = data.config           || { ingestToken: '', lastIngest: '', aiKalibrering: '' };
         persistAll({toast: 'Gjenopprettet fra lokal snapshot'});
         navigate('dashboard');
       } catch (e) {
@@ -2089,10 +2090,11 @@ async function loadAll() {
     DB.watchedCompanies = (watched    || []).map(r => r.data);
     DB.creditAlerts     = (alerts     || []).map(r => r.data);
     DB.config           = cfgRow ? {
-      ingestToken: cfgRow.ingest_token || '',
-      lastIngest:  cfgRow.last_ingest  || '',
-      scraperLog:  cfgRow.scraper_log  || [],
-    } : { ingestToken: '', lastIngest: '', scraperLog: [] };
+      ingestToken:    cfgRow.ingest_token    || '',
+      lastIngest:     cfgRow.last_ingest     || '',
+      scraperLog:     cfgRow.scraper_log     || [],
+      aiKalibrering:  cfgRow.ai_kalibrering  || '',
+    } : { ingestToken: '', lastIngest: '', scraperLog: [], aiKalibrering: '' };
 
     _safeProjectCount  = DB.projects.length;
     _safeCustomerCount = DB.customers.length;
@@ -4611,19 +4613,20 @@ async function generateProjectEstimate(projectId) {
       ).join('\n')}`
     : '';
 
-  const prompt = `Du er en erfaren norsk rådgivningskonsulent. Gi et konkret honorarestimat for dette oppdraget.
-
+  const kalib = (DB.config?.aiKalibrering || '').trim();
+  const prompt = `Du er rådgiver i ESS Consulting AS og skal gi et konkret honorarestimat.
+${kalib ? `\nVÅR FAKTISKE PRISING OG ERFARING (bruk dette som grunnlag — ikke generiske markedssatser):\n${kalib}\n` : ''}
 Oppdragstype: ${typeLabel}
 Kunde: ${escHtml(c?.name || 'ukjent')}
 Beskrivelse: ${desc}
-${history ? `\nVår faktureringshistorikk (bruk som referanse):\n${history}` : ''}${prevEst}
+${history ? `\nVår faktureringshistorikk fra andre prosjekter:\n${history}` : ''}${prevEst}
 
 Svar med:
 1. Estimert honorar: [intervall i NOK]
 2. Begrunnelse: [2-3 setninger]
 3. Usikkerhetsmomenter: [1-2 punkter]
 
-Vær konkret og realistisk for norsk SMB-rådgivningsmarked. Ikke McKinsey-nivå.`;
+Vær konkret. Bruk vår faktiske prising som utgangspunkt — ikke generelle markedssatser.`;
 
   try {
     const text = await callAI(prompt, 600);
@@ -6688,6 +6691,31 @@ function renderSettings() {
     </div>
   </div>
 
+  <div class="card mb-16">
+    <div class="card-header"><div class="card-title">${_ICON_AI} AI-kalibrering — honorarestimat</div></div>
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+        Beskriv din faktiske prising her — timepris, typiske honorarer per oppdragstype, hva som driver prisen opp/ned.
+        AI-en bruker dette som kontekst i alle honorarestimater og treffer da mye bedre.
+      </p>
+      <textarea id="ai-kalib-input" class="form-control" rows="7" style="font-size:13px;line-height:1.6;resize:vertical"
+        placeholder="Eksempel:
+Timepris: NOK 1 800–2 200/time (avhengig av oppdrag og kunde).
+
+Typiske honorarer:
+- Verdivurdering (SMB, enkelt): NOK 40 000–80 000
+- Verdivurdering (kompleks/M&A): NOK 80 000–200 000
+- Aksjekjøpsavtale (standard): NOK 60 000–120 000
+- Omorganisering (fusjon/fisjon): NOK 50 000–150 000
+- Generell rådgivning (per mnd): NOK 15 000–40 000
+
+Prisdriver opp: mange parter, forhandlingsrunder, børsnotert selskap, tight deadline.
+Prisdriver ned: fast kunde, begrenset scope, enkel struktur."
+      >${escHtml(DB.config?.aiKalibrering || '')}</textarea>
+      <button class="btn btn-primary" style="margin-top:10px" onclick="saveAiKalibrering()">💾 Lagre kalibrering</button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-header"><div class="card-title">📊 Statistikk</div></div>
     <div class="card-body">
@@ -6701,6 +6729,14 @@ function renderSettings() {
       </div>
     </div>
   </div>`;
+}
+
+function saveAiKalibrering() {
+  const txt = document.getElementById('ai-kalib-input')?.value || '';
+  if (!DB.config) DB.config = {};
+  DB.config.aiKalibrering = txt;
+  persistAll();
+  showToast('AI-kalibrering lagret ✓', 'success');
 }
 
 function saveApiKey() {
