@@ -28,13 +28,14 @@ ess-consulting/
 |---|---|---|
 | `ANTHROPIC_API_KEY` | `ai.js` | Claude API-nøkkel |
 | `INGEST_TOKEN` | `anmerkninger-ingest.js` | Shared secret for innsending av betalingsanmerkninger |
-| `SUPABASE_URL` | `anmerkninger-ingest.js` | Supabase prosjekt-URL (f.eks. `https://qnhdtdctxhltiwofmjmj.supabase.co`) |
+| `SUPABASE_URL` | `app-config.js`, `anmerkninger-ingest.js` | Supabase prosjekt-URL (f.eks. `https://qnhdtdctxhltiwofmjmj.supabase.co`) |
+| `SUPABASE_ANON_KEY` | `app-config.js` | Supabase anon/public-nøkkel — sendes til klienten ved innlogging |
 | `SUPABASE_SERVICE_ROLE_KEY` | `anmerkninger-ingest.js` | Service role-nøkkel (omgår RLS — kun server-side) |
 | `RESEND_API_KEY` | `anmerkninger-ingest.js` | API-nøkkel fra resend.com — sender ukentlig e-postrapport til erlend/sondre/kenneth. Krever at `essc.no` er verifisert som avsenderdomene i Resend-dashbordet. Valgfri — e-post hoppes over hvis ikke satt. |
 
 **Hosting:** Netlify (auto-deploy fra GitHub `main`-branch)
 **Database:** Supabase PostgreSQL (prosjekt: `qnhdtdctxhltiwofmjmj`)
-**Auth:** Supabase Auth — magic link (OTP e-post), ingen passord
+**Auth:** Supabase Auth — e-post + passord (`signInWithPassword`)
 **AI:** Anthropic Claude via Netlify Function-proxy (`/.netlify/functions/ai`)
 **Styling:** Tailwind CSS via CDN + egne CSS-variabler
 
@@ -42,15 +43,12 @@ ess-consulting/
 
 ## Supabase-konfigurasjon
 
-```javascript
-const _supabase = supabase.createClient(
-  'https://qnhdtdctxhltiwofmjmj.supabase.co',
-  'sb_publishable_zo52TmhPZaHScF2-YC9V6w_luE8LUDq'  // anon/publishable key
-);
-```
+Klienten initialiseres via `/.netlify/functions/app-config` som returnerer
+URL og anon-nøkkel fra Netlify-miljøvariabler (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
+Nøkler er **ikke** hardkodet i kildekoden.
 
-**Auth:** Magic link via `_supabase.auth.signInWithOtp({ email })`.
-**RLS:** Alle tabeller har Row Level Security — policy: `auth.email() = 'erlend.sandberg@gmail.com'`.
+**Auth:** E-post + passord via `_supabase.auth.signInWithPassword()`.
+**RLS:** Alle tabeller har Row Level Security — policy: `auth.email() = 'erlend@essc.no'`.
 **Dashboard:** https://supabase.com/dashboard/project/qnhdtdctxhltiwofmjmj
 
 ---
@@ -259,7 +257,7 @@ let APP = {
 | `uid()` | 1884 | Genererer unik ID |
 | `now()` | 1893 | ISO-timestamp |
 | `escHtml(str)` | 1962 | XSS-sikring |
-| `doLogin()` | ~9733 | Magic link OTP via Supabase Auth |
+| `doLogin()` | ~9733 | E-post + passord via Supabase Auth |
 | `doLogout()` | ~9759 | Logg ut via Supabase Auth |
 
 ---

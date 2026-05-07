@@ -11,11 +11,16 @@
 <!-- Supabase JS client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-  const _supabase = supabase.createClient(
-    'https://qnhdtdctxhltiwofmjmj.supabase.co',
-    'sb_publishable_zo52TmhPZaHScF2-YC9V6w_luE8LUDq',
-    { auth: { flowType: 'implicit' } }
-  );
+  // Nøkler hentes fra Netlify-funksjon — ikke hardkodet i kildekoden
+  let _supabase;
+  const _supabaseInit = fetch('/.netlify/functions/app-config')
+    .then(r => r.json())
+    .then(cfg => {
+      _supabase = supabase.createClient(cfg.url, cfg.key, {
+        auth: { flowType: 'implicit' }
+      });
+    })
+    .catch(e => console.error('Konfig-lasting feilet:', e));
 </script>
 <script>
   // ESS Consulting logo (base64)
@@ -9812,9 +9817,9 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Auth-tilstandslytter — styrer hele app-flyten
+// Auth-tilstandslytter — styrer hele app-flyten (venter på Supabase-init)
 let _appInitialized = false;
-_supabase.auth.onAuthStateChange(async (event, session) => {
+_supabaseInit.then(() => _supabase.auth.onAuthStateChange(async (event, session) => {
   const loginScreen = document.getElementById('login-screen');
   const appShell    = document.getElementById('app-shell');
 
@@ -9836,7 +9841,7 @@ _supabase.auth.onAuthStateChange(async (event, session) => {
     // Fokus på e-postfeltet
     setTimeout(() => document.getElementById('login-email')?.focus(), 100);
   }
-});
+}));
 </script>
 
 <!-- VERA CHAT -->
