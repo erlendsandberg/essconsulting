@@ -13,7 +13,8 @@
 <script>
   const _supabase = supabase.createClient(
     'https://qnhdtdctxhltiwofmjmj.supabase.co',
-    'sb_publishable_zo52TmhPZaHScF2-YC9V6w_luE8LUDq'
+    'sb_publishable_zo52TmhPZaHScF2-YC9V6w_luE8LUDq',
+    { auth: { flowType: 'implicit' } }
   );
 </script>
 <script>
