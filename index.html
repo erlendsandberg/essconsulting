@@ -9964,7 +9964,30 @@ async function initApp() {
   if (bar) bar.style.width = '50%';
   if (msg) msg.textContent = 'Laster prosjektdata…';
 
-  await loadAll();
+  // Timeout på 14 sek — henger ellers for alltid hvis nettverk/utvidelser blokkerer
+  const loadTimeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('TIMEOUT')), 14000)
+  );
+
+  try {
+    await Promise.race([loadAll(), loadTimeout]);
+  } catch(err) {
+    const isTimeout = err?.message === 'TIMEOUT';
+    if (bar) { bar.style.background = '#e53e3e'; bar.style.width = '100%'; }
+    if (msg) msg.textContent = isTimeout
+      ? '⚠ Nettverket svarer ikke — prøv å deaktivere Chrome-utvidelser eller bruk inkognito'
+      : '⚠ Lasting feilet: ' + (err?.message || err);
+
+    const loader = document.getElementById('fb-loading');
+    if (loader) {
+      const retryBtn = document.createElement('button');
+      retryBtn.textContent = '↻ Prøv igjen';
+      retryBtn.style.cssText = 'margin-top:18px;padding:10px 28px;background:#2E75B6;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer';
+      retryBtn.onclick = () => location.reload();
+      loader.appendChild(retryBtn);
+    }
+    return;
+  }
 
   if (bar) bar.style.width = '100%';
 
