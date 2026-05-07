@@ -16,11 +16,18 @@
   const _supabaseInit = fetch('/.netlify/functions/app-config')
     .then(r => r.json())
     .then(cfg => {
+      if (!cfg.url || !cfg.key) throw new Error('Supabase URL eller nøkkel mangler i miljøvariabler');
       _supabase = supabase.createClient(cfg.url, cfg.key, {
         auth: { flowType: 'implicit' }
       });
     })
-    .catch(e => console.error('Konfig-lasting feilet:', e));
+    .catch(e => {
+      console.error('Konfig-lasting feilet:', e);
+      const msg = document.getElementById('fb-loading-msg');
+      if (msg) msg.textContent = '⚠ Konfigurasjonsfeil – ta kontakt med administrator';
+      const bar = document.getElementById('fb-loading-bar');
+      if (bar) { bar.style.background = '#e53e3e'; bar.style.width = '100%'; }
+    });
 </script>
 <script>
   // ESS Consulting logo (base64)
@@ -9829,7 +9836,9 @@ document.addEventListener('keydown', (e) => {
 
 // Auth-tilstandslytter — styrer hele app-flyten (venter på Supabase-init)
 let _appInitialized = false;
-_supabaseInit.then(() => _supabase.auth.onAuthStateChange(async (event, session) => {
+_supabaseInit.then(() => {
+  if (!_supabase) return; // Init feilet — feilmelding er allerede vist i lasteskjermen
+  _supabase.auth.onAuthStateChange(async (event, session) => {
   const loginScreen = document.getElementById('login-screen');
   const appShell    = document.getElementById('app-shell');
 
@@ -9851,7 +9860,8 @@ _supabaseInit.then(() => _supabase.auth.onAuthStateChange(async (event, session)
     // Fokus på e-postfeltet
     setTimeout(() => document.getElementById('login-email')?.focus(), 100);
   }
-}));
+  });
+});
 </script>
 
 <!-- VERA CHAT -->
