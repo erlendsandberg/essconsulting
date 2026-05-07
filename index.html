@@ -6698,21 +6698,17 @@ function renderSettings() {
         Beskriv din faktiske prising her — timepris, typiske honorarer per oppdragstype, hva som driver prisen opp/ned.
         AI-en bruker dette som kontekst i alle honorarestimater og treffer da mye bedre.
       </p>
-      <textarea id="ai-kalib-input" class="form-control" rows="7" style="font-size:13px;line-height:1.6;resize:vertical"
-        placeholder="Eksempel:
-Timepris: NOK 1 800–2 200/time (avhengig av oppdrag og kunde).
-
-Typiske honorarer:
-- Verdivurdering (SMB, enkelt): NOK 40 000–80 000
-- Verdivurdering (kompleks/M&A): NOK 80 000–200 000
-- Aksjekjøpsavtale (standard): NOK 60 000–120 000
-- Omorganisering (fusjon/fisjon): NOK 50 000–150 000
-- Generell rådgivning (per mnd): NOK 15 000–40 000
-
-Prisdriver opp: mange parter, forhandlingsrunder, børsnotert selskap, tight deadline.
-Prisdriver ned: fast kunde, begrenset scope, enkel struktur."
+      <textarea id="ai-kalib-input" class="form-control" rows="10" style="font-size:13px;line-height:1.6;resize:vertical"
+        placeholder="Timepris: NOK 2 600/time&#10;&#10;Typiske honorarer:&#10;- Lite oppdrag (1–10t): NOK 2 500–25 000&#10;- Mellomstort (10–50t): NOK 25 000–130 000&#10;- Stort (50–150t): NOK 100 000–250 000&#10;&#10;Prisdrivere opp: kompleks struktur, mange parter, ukjent kunde.&#10;Prisdrivere ned: fast kunde, avgrenset scope."
       >${escHtml(DB.config?.aiKalibrering || '')}</textarea>
-      <button class="btn btn-primary" style="margin-top:10px" onclick="saveAiKalibrering()">💾 Lagre kalibrering</button>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="saveAiKalibrering()">💾 Lagre kalibrering</button>
+        <input type="file" id="tripletex-import-file" accept=".xls,.xlsx,.csv" style="display:none" onchange="importTripletexKalibrering(event)">
+        <button class="btn btn-secondary" onclick="document.getElementById('tripletex-import-file').click()">📊 Importer fra Tripletex…</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-muted);margin-top:6px">
+        Tripletex: eksporter «Resultatrapport for prosjekter» som Excel og last opp her — genererer kalibrering automatisk.
+      </div>
     </div>
   </div>
 
@@ -6737,6 +6733,132 @@ function saveAiKalibrering() {
   DB.config.aiKalibrering = txt;
   persistAll();
   showToast('AI-kalibrering lagret ✓', 'success');
+}
+
+async function importTripletexKalibrering(event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+
+  showToast('Leser Tripletex-fil…', 'info');
+
+  try {
+    // Tripletex-eksporten er HTML-som-XLS — les som tekst og parse tabellen
+    const text = await file.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'text/html');
+    const rows = Array.from(doc.querySelectorAll('tr'));
+
+    if (!rows.length) throw new Error('Fant ingen tabellrader i filen');
+
+    // Finn kolonner fra header-rad
+    const headers = Array.from(rows[0].querySelectorAll('th,td'))
+      .map(c => c.textContent.trim().toLowerCase());
+
+    // Prøv å finne kolonner for prosjekt, fakturert beløp, timer
+    const colIdx = (terms) => {
+      const i = headers.findIndex(h => terms.some(t => h.includes(t)));
+      return i >= 0 ? i : null;
+    };
+
+    const iProsjekt  = colIdx(['prosjekt','project','navn','name']);
+    const iFakturert = colIdx(['fakturert','faktura','inntekt','revenue','invoiced']);
+    const iTimer     = colIdx(['timer','hours','tid']);
+    const iKostnad   = colIdx(['kostnad','cost','utgift']);
+
+    if (iFakturert === null) throw new Error('Fant ikke fakturert-kolonne. Eksporter «Resultatrapport for prosjekter» fra Tripletex.');
+
+    // Parse alle datarader
+    const prosjekter = [];
+    for (let i = 1; i < rows.length; i++) {
+      const cells = Array.from(rows[i].querySelectorAll('td,th')).map(c => c.textContent.trim());
+      if (cells.length < 2) continue;
+
+      const parseNOK = (s) => {
+        if (!s) return 0;
+        const n = parseFloat(s.replace(/[^\d,.-]/g,'').replace(',','.'));
+        return isNaN(n) ? 0 : Math.abs(n);
+      };
+      const parseH = (s) => {
+        if (!s) return 0;
+        // Tripletex lagrer timer som tideler (600 = 60,0 timer)
+        const n = parseFloat(s.replace(',','.'));
+        return isNaN(n) ? 0 : (n > 500 ? n / 10 : n); // auto-detect tidel-format
+      };
+
+      const fakturert = iFakturert !== null ? parseNOK(cells[iFakturert]) : 0;
+      const timer     = iTimer     !== null ? parseH(cells[iTimer])       : 0;
+      const navn      = iProsjekt  !== null ? (cells[iProsjekt] || '')    : '';
+
+      if (fakturert > 0) {
+        prosjekter.push({ navn, fakturert, timer });
+      }
+    }
+
+    if (!prosjekter.length) throw new Error('Ingen prosjekter med fakturert beløp funnet.');
+
+    // Beregn statistikk
+    const beløp = prosjekter.map(p => p.fakturert).sort((a,b) => a-b);
+    const totalt = beløp.reduce((s,v) => s+v, 0);
+    const snitt  = Math.round(totalt / beløp.length);
+    const median = beløp[Math.floor(beløp.length / 2)];
+    const min    = beløp[0];
+    const max    = beløp[beløp.length - 1];
+
+    // Grupper etter størrelse
+    const bucket = (v) =>
+      v < 10000   ? 'lite'    :
+      v < 50000   ? 'mellom'  :
+      v < 150000  ? 'stort'   : 'mandat';
+
+    const grupper = { lite: [], mellom: [], stort: [], mandat: [] };
+    prosjekter.forEach(p => grupper[bucket(p.fakturert)].push(p));
+
+    const fmtBucket = (arr, label) => {
+      if (!arr.length) return '';
+      const bMin = Math.round(Math.min(...arr.map(p=>p.fakturert)));
+      const bMax = Math.round(Math.max(...arr.map(p=>p.fakturert)));
+      const hArr = arr.filter(p=>p.timer>0);
+      const hTxt = hArr.length
+        ? ` (${Math.round(Math.min(...hArr.map(p=>p.timer)))}–${Math.round(Math.max(...hArr.map(p=>p.timer)))} timer)`
+        : '';
+      return `- ${label}${hTxt}: NOK ${bMin.toLocaleString('nb-NO')}–${bMax.toLocaleString('nb-NO')} (${arr.length} prosjekter)`;
+    };
+
+    // Finn timepris fra prosjekter med rimelig time/beløp-ratio
+    const rater = prosjekter
+      .filter(p => p.timer > 5 && p.timer < 200 && p.fakturert > 0)
+      .map(p => p.fakturert / p.timer)
+      .filter(r => r > 1000 && r < 5000);
+    const timepris = rater.length
+      ? Math.round(rater.reduce((s,v)=>s+v,0) / rater.length / 100) * 100
+      : 2600;
+
+    const kalib = [
+      `Timepris: NOK ${timepris.toLocaleString('nb-NO')}/time (beregnet fra ${rater.length} prosjekter i Tripletex).`,
+      ``,
+      `FAKTISK HONORARHISTORIKK — ${prosjekter.length} prosjekter, totalt NOK ${Math.round(totalt).toLocaleString('nb-NO')} fakturert:`,
+      `Median: NOK ${Math.round(median).toLocaleString('nb-NO')} | Snitt: NOK ${snitt.toLocaleString('nb-NO')} | Maks: NOK ${Math.round(max).toLocaleString('nb-NO')}`,
+      ``,
+      `Honorarspenn per prosjektstørrelse:`,
+      fmtBucket(grupper.lite,   'Lite oppdrag (<10 timer)'),
+      fmtBucket(grupper.mellom, 'Mellomstort oppdrag (10–50 timer)'),
+      fmtBucket(grupper.stort,  'Stort oppdrag (50–150 timer)'),
+      fmtBucket(grupper.mandat, 'Langsiktig mandat (150+ timer)'),
+      ``,
+      `Prisdrivere OPP: kompleks struktur, mange parter, forhandlingsrunder, ukjent kunde, tett frist.`,
+      `Prisdrivere NED: fast kunde, avgrenset og klart definert scope, standarddokumenter.`,
+    ].filter(l => l !== null && !l.startsWith('- ') || l !== '').join('\n');
+
+    // Fyll inn i textarea
+    const ta = document.getElementById('ai-kalib-input');
+    if (ta) ta.value = kalib;
+    showToast(`Leste ${prosjekter.length} prosjekter — kontroller og lagre`, 'success');
+
+  } catch(e) {
+    console.error('Tripletex import feil:', e);
+    showToast('Import feilet: ' + e.message, 'error');
+  }
 }
 
 function saveApiKey() {
