@@ -2277,16 +2277,28 @@ function escHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// Enkel markdown → HTML (brukes for AI-estimater og Vera-svar)
+// Markdown → HTML, linje for linje — maks én blank linje mellom avsnitt
 function renderMd(t) {
   if (!t) return '';
-  return escHtml(t)
-    .replace(/^---+$/gm, '')                        // fjern horisontale skillelinjer
-    .replace(/^#{1,3} (.+)$/gm, '<strong style="display:block;margin-top:6px">$1</strong>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^[-*] /gm, '&nbsp;&nbsp;· ')
-    .replace(/(<br>){3,}/g, '<br><br>')             // maks to linjeskift på rad
-    .replace(/\n/g, '<br>');
+  const bold = s => escHtml(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  const out = [];
+  let prevEmpty = false;
+  for (const raw of t.split('\n')) {
+    const line = raw.trim();
+    if (!line || /^-{3,}$/.test(line)) {          // tom linje eller --- skillelinje
+      if (!prevEmpty && out.length) out.push('');
+      prevEmpty = true;
+      continue;
+    }
+    prevEmpty = false;
+    const h = line.match(/^#{1,3} (.+)$/);
+    if (h)              { out.push('<strong>' + bold(h[1]) + '</strong>'); continue; }
+    if (/^[-*] /.test(line)) { out.push('· ' + bold(line.slice(2)));      continue; }
+    out.push(bold(line));
+  }
+  while (out.length && out[0] === '')             out.shift();
+  while (out.length && out[out.length-1] === '')  out.pop();
+  return out.join('<br>');
 }
 
 function getCustomer(id) { return DB.customers.find(c => c.id === id); }
