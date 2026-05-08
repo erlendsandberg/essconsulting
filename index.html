@@ -22,7 +22,7 @@
       // Chrome-utvidelser blokkerer Supabase-kall permanent
       const _fetchWithTimeout = (url, init = {}) => {
         const ctrl = new AbortController();
-        const tid  = setTimeout(() => ctrl.abort(), 12000);
+        const tid  = setTimeout(() => ctrl.abort(), 8000);
         return fetch(url, { ...init, signal: ctrl.signal })
           .finally(() => clearTimeout(tid));
       };
@@ -10004,9 +10004,9 @@ async function initApp() {
   if (bar) bar.style.width = '50%';
   if (msg) msg.textContent = 'Laster prosjektdata…';
 
-  // Timeout på 14 sek — henger ellers for alltid hvis nettverk/utvidelser blokkerer
+  // Timeout på 10 sek — henger ellers for alltid hvis nettverk/utvidelser blokkerer
   const loadTimeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('TIMEOUT')), 14000)
+    setTimeout(() => reject(new Error('TIMEOUT')), 10000)
   );
 
   try {
@@ -10014,10 +10014,13 @@ async function initApp() {
   } catch(err) {
     const isTimeout = err?.message === 'TIMEOUT';
 
-    // Ved timeout: nullstill den lokale sesjonen (kan være korrupt) og last inn på nytt.
-    // Brukeren slipper å gjøre "Clear site data" manuelt.
-    if (isTimeout && _supabase) {
-      try { await _supabase.auth.signOut({ scope: 'local' }); } catch(_) {}
+    // Ved timeout: tøm Supabase-sesjon fra localStorage direkte (rask, ingen nettverkskall)
+    if (isTimeout) {
+      try {
+        Object.keys(localStorage)
+          .filter(k => k.startsWith('sb-'))
+          .forEach(k => localStorage.removeItem(k));
+      } catch(_) {}
       location.reload();
       return;
     }
@@ -10061,9 +10064,29 @@ document.addEventListener('keydown', (e) => {
 
 // Auth-tilstandslytter — styrer hele app-flyten (venter på Supabase-init)
 let _appInitialized = false;
+
+// Global sikkerhetsventil: hvis onAuthStateChange ikke har fyrt innen 15 sek
+// (f.eks. Supabase-JS sitter fast i token-refresh-loop), tøm localStorage og vis login.
+const _globalInitGuard = setTimeout(() => {
+  const loading = document.getElementById('fb-loading');
+  if (!loading) return; // App er allerede oppe — avbryt
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sb-'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch(_) {}
+  const loginScreen = document.getElementById('login-screen');
+  const appShell    = document.getElementById('app-shell');
+  if (loading) { loading.style.opacity = '0'; setTimeout(() => loading.remove(), 400); }
+  if (appShell)    appShell.style.display    = 'none';
+  if (loginScreen) loginScreen.style.display = 'flex';
+  setTimeout(() => document.getElementById('login-email')?.focus(), 100);
+}, 15000);
+
 _supabaseInit.then(() => {
   if (!_supabase) return; // Init feilet — feilmelding er allerede vist i lasteskjermen
   _supabase.auth.onAuthStateChange(async (event, session) => {
+  clearTimeout(_globalInitGuard); // Auth-flyten er i gang — kanseller sikkerhetsventilen
   const loginScreen = document.getElementById('login-screen');
   const appShell    = document.getElementById('app-shell');
 
