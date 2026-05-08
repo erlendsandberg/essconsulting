@@ -9983,11 +9983,17 @@ async function initApp() {
     await Promise.race([loadAll(), loadTimeout]);
   } catch(err) {
     const isTimeout = err?.message === 'TIMEOUT';
-    if (bar) { bar.style.background = '#e53e3e'; bar.style.width = '100%'; }
-    if (msg) msg.textContent = isTimeout
-      ? '⚠ Nettverket svarer ikke — prøv å deaktivere Chrome-utvidelser eller bruk inkognito'
-      : '⚠ Lasting feilet: ' + (err?.message || err);
 
+    // Ved timeout: nullstill den lokale sesjonen (kan være korrupt) og last inn på nytt.
+    // Brukeren slipper å gjøre "Clear site data" manuelt.
+    if (isTimeout && _supabase) {
+      try { await _supabase.auth.signOut({ scope: 'local' }); } catch(_) {}
+      location.reload();
+      return;
+    }
+
+    if (bar) { bar.style.background = '#e53e3e'; bar.style.width = '100%'; }
+    if (msg) msg.textContent = '⚠ Lasting feilet: ' + (err?.message || err);
     const loader = document.getElementById('fb-loading');
     if (loader) {
       const retryBtn = document.createElement('button');
