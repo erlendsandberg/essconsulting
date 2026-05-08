@@ -4474,7 +4474,8 @@ function renderHonorar() {
 const AI_MODEL = 'claude-sonnet-4-6';
 
 /* Hjelper: kall Anthropic API via Netlify Function-proxy.
-   Har 15 s timeout og 1 retry ved 5xx eller nettverksfeil. */
+   Klient-timeout: 30 s (server svarer med feil etter 22 s, Netlify dreper etter 26 s).
+   Én retry kun ved rene nettverksfeil (TypeError), ikke ved timeout eller HTTP-feil. */
 async function callAI(prompt, maxTokens=1000, systemPrompt=null) {
   const body = {
     model: AI_MODEL,
@@ -4485,7 +4486,7 @@ async function callAI(prompt, maxTokens=1000, systemPrompt=null) {
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15000);
+    const timer = setTimeout(() => ctrl.abort(), 30000);
     try {
       const res = await fetch('/.netlify/functions/ai', {
         method: 'POST',
@@ -4494,17 +4495,17 @@ async function callAI(prompt, maxTokens=1000, systemPrompt=null) {
         signal: ctrl.signal,
       });
       clearTimeout(timer);
-      if (res.status >= 500 && attempt === 0) continue; // server error → ett retry
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error?.message || 'Feil ved AI-kall (HTTP ' + res.status + ')');
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody?.error?.message || 'Feil ved AI-kall (HTTP ' + res.status + ')');
       }
       const data = await res.json();
       return data.content?.map(b => b.text || '').join('') || '';
     } catch (e) {
       clearTimeout(timer);
-      if (attempt === 0 && (e.name === 'AbortError' || e.name === 'TypeError')) continue;
-      if (e.name === 'AbortError') throw new Error('AI-kallet tok for lang tid (timeout 15s)');
+      // Bare retry ved rene nettverksfeil (DNS-feil e.l.) — ikke ved timeout
+      if (attempt === 0 && e.name === 'TypeError') continue;
+      if (e.name === 'AbortError') throw new Error('AI-kallet tok for lang tid (>30 s) — prøv et kortere dokument');
       throw e;
     }
   }
