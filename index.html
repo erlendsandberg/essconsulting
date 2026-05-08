@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ESS Consulting AS – Prosjektstyring</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231B2A4A'/><rect x='5' y='18' width='5' height='9' rx='1' fill='%232E75B6'/><rect x='13' y='12' width='5' height='15' rx='1' fill='%23B8742A'/><rect x='21' y='7' width='5' height='20' rx='1' fill='%232E75B6'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,400&display=swap" rel="stylesheet">
@@ -17,8 +18,17 @@
     .then(r => r.json())
     .then(cfg => {
       if (!cfg.url || !cfg.key) throw new Error('Supabase URL eller nøkkel mangler i miljøvariabler');
+      // Custom fetch med 12-sekunders timeout per kall — forhindrer at
+      // Chrome-utvidelser blokkerer Supabase-kall permanent
+      const _fetchWithTimeout = (url, init = {}) => {
+        const ctrl = new AbortController();
+        const tid  = setTimeout(() => ctrl.abort(), 12000);
+        return fetch(url, { ...init, signal: ctrl.signal })
+          .finally(() => clearTimeout(tid));
+      };
       _supabase = supabase.createClient(cfg.url, cfg.key, {
-        auth: { flowType: 'implicit' }
+        auth:   { flowType: 'implicit' },
+        global: { fetch: _fetchWithTimeout },
       });
     })
     .catch(e => {
