@@ -10013,10 +10013,8 @@ async function initApp() {
     setTimeout(() => loader.remove(), 400);
   }
 
-  if (!DB.customers.length && !DB.projects.length) {
-    loadDemoData();
-    return;
-  }
+  // ALDRI kall loadDemoData() automatisk — det sletter all Supabase-data.
+  // Tom database er OK (ny bruker). Demo-data lastes kun manuelt fra Innstillinger.
   navigate('dashboard');
 
   // Periodisk lokal snapshot-backup hvert 2. minutt (MIN_SNAPSHOT_INTERVAL_MS)
