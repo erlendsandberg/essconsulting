@@ -104,9 +104,12 @@ exports.handler = async (event) => {
     .trim()
     .slice(0, 200); // OneDrive maks mappenavn
 
+  // Koder en OneDrive-sti korrekt: hvert segment enkodes, men / beholdes
+  const encodePath = p => p.split('/').map(encodeURIComponent).join('/');
+
   // Sjekk om en sti finnes (returnerer item eller null)
   async function itemExists(path) {
-    const res = await fetch(`${graphBase}/root:/${encodeURIComponent(path)}`, {
+    const res = await fetch(`${graphBase}/root:/${encodePath(path)}`, {
       headers: authHdr,
     });
     if (res.status === 404) return null;
@@ -119,7 +122,7 @@ exports.handler = async (event) => {
 
   // Opprett mappe under en gitt sti
   async function createFolder(parentPath, name) {
-    const url = `${graphBase}/root:/${encodeURIComponent(parentPath)}:/children`;
+    const url = `${graphBase}/root:/${encodePath(parentPath)}:/children`;
     const res = await fetch(url, {
       method:  'POST',
       headers: authHdr,

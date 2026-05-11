@@ -10672,6 +10672,9 @@ async function submitOnboarding() {
   // Opprett SharePoint-mapper i OneDrive (ikke-blokkerende)
   _createSharePointFolders(d.name, dealId, typeLabels[_ob.assignmentType] || '');
 
+  // Hent siste 3 årsregnskap fra Brønnøysund og legg i 01 Grunnlag (ikke-blokkerende)
+  _fetchAarsregnskap(d.orgNr, d.name, projId);
+
   // Vis suksess-side umiddelbart — brevet genereres i bakgrunnen
   _ob.done          = true;
   _ob.projId        = projId;
@@ -10682,6 +10685,60 @@ async function submitOnboarding() {
   _obGenerateLetter(customer, projTypeKey, typeLabels[_ob.assignmentType])
     .catch(e => showToast('Klarte ikke generere oppdragsbrev: ' + e.message, 'error'))
     .finally(() => { _ob.letterLoading = false; render(); });
+}
+
+// Hent siste 3 årsregnskap fra Brønnøysund og lagre som dokument i 01 Grunnlag
+async function _fetchAarsregnskap(orgNr, companyName, projectId) {
+  try {
+    const url = `https://data.brreg.no/regnskapsregisteret/regnskap?orgNummer=${orgNr}&size=3`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return; // Ikke alle selskaper har regnskap i registeret
+
+    const data  = await res.json();
+    const items = data?._embedded?.regnskap || [];
+    if (!items.length) return;
+
+    // Formater hvert regnskap som lesbar tekst
+    const fmtNr = v => v != null ? Number(v).toLocaleString('nb-NO') : '–';
+
+    items.slice(0, 3).forEach(r => {
+      const år      = r.regnskapsperiode?.fraDato?.slice(0, 4) || '?';
+      const rs      = r.resultatregnskapResultat || {};
+      const ba      = r.balanseregnskapSumVerdier || {};
+      const lines   = [
+        `ÅRSREGNSKAP ${år} — ${companyName} (org.nr ${orgNr})`,
+        `Regnskapstype: ${r.regnskapstype || '–'} · Valuta: ${r.valuta || 'NOK'}`,
+        '',
+        '── RESULTAT ──────────────────────────────',
+        `Driftsinntekter:          ${fmtNr(rs.driftsresultat?.driftsinntekter?.sumDriftsinntekter)} kr`,
+        `Driftsresultat:           ${fmtNr(rs.driftsresultat?.driftsresultat)} kr`,
+        `Ordinært resultat f. skatt: ${fmtNr(rs.ordinaertResultatFoerSkattekostnad)} kr`,
+        `Årsresultat:              ${fmtNr(rs.aarsresultat)} kr`,
+        '',
+        '── BALANSE ───────────────────────────────',
+        `Sum eiendeler:            ${fmtNr(ba.sumEiendeler)} kr`,
+        `Sum egenkapital:          ${fmtNr(ba.sumEgenkapitalGjeld?.sumEgenkapital)} kr`,
+        `Sum gjeld:                ${fmtNr(ba.sumEgenkapitalGjeld?.sumGjeld)} kr`,
+        '',
+        `Kilde: Brønnøysundregistrene / Regnskapsregisteret`,
+      ].join('\n');
+
+      DB.documents.push({
+        id:        uid(),
+        projectId,
+        name:      `Årsregnskap ${år} – ${companyName}.txt`,
+        type:      'txt',
+        chars:     lines.length,
+        text:      lines,
+        folder:    '01 Grunnlag',
+        createdAt: now(),
+      });
+    });
+
+    persistAll({ toast: `📊 ${items.slice(0, 3).length} årsregnskap hentet fra Brønnøysund → 01 Grunnlag` });
+  } catch (e) {
+    console.warn('Årsregnskap-henting feilet:', e.message);
+  }
 }
 
 // Lagre oppdragsbrev som notat på prosjektet
