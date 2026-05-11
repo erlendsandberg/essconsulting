@@ -10415,6 +10415,8 @@ let _ob = {
   responsibleAdvisor:  'Erlend Synnes-Sandberg',
   letter:              null,   // generert oppdragsbrev
   letterLoading:       false,
+  done:                false,  // onboarding fullført
+  projId:              null,   // ID til opprettet prosjekt
 };
 
 function _obReset() {
@@ -10426,6 +10428,7 @@ function _obReset() {
     leadSource: '', priority: 'middels',
     responsibleAdvisor: 'Erlend Synnes-Sandberg',
     letter: null, letterLoading: false,
+    done: false, projId: null,
   };
 }
 
@@ -10633,21 +10636,29 @@ async function submitOnboarding() {
   generatePhaseTasks(projId, projTypeKey);
   generateOnboardingTasks(projId);
   logActivity('notat', projId, `Onboarding fullført: klient «${d.name}», prosjekt ${dealId}, mappestruktur og sjekkliste opprettet.`);
-  persistAll({ toast: `Klient og prosjekt opprettet for ${d.name} (${dealId})` });
+  persistAll();
 
-  // Opprett SharePoint-mapper i OneDrive (ikke-blokkerende — viser advarsel ved feil)
+  // Opprett SharePoint-mapper i OneDrive (ikke-blokkerende)
   _createSharePointFolders(d.name, dealId, typeLabels[_ob.assignmentType] || '');
 
-  // Generer oppdragsbrev
+  // Vis suksess-side umiddelbart — brevet genereres i bakgrunnen
+  _ob.done          = true;
+  _ob.projId        = projId;
   _ob.letterLoading = true;
   render();
-  try {
-    await _obGenerateLetter(customer, projTypeKey, typeLabels[_ob.assignmentType]);
-  } catch (e) {
-    showToast('Klarte ikke generere oppdragsbrev: ' + e.message, 'error');
-  }
-  _ob.letterLoading = false;
-  render();
+
+  // Generer oppdragsbrev i bakgrunnen (ikke-blokkerende for UI)
+  _obGenerateLetter(customer, projTypeKey, typeLabels[_ob.assignmentType])
+    .catch(e => showToast('Klarte ikke generere oppdragsbrev: ' + e.message, 'error'))
+    .finally(() => { _ob.letterLoading = false; render(); });
+}
+
+// Lagre oppdragsbrev som notat på prosjektet
+function _obSaveLetter() {
+  if (!_ob.letter || !_ob.projId) return;
+  DB.notes.push({ id: uid(), projectId: _ob.projId, text: `📄 Oppdragsbekreftelse\n\n${_ob.letter}`, createdAt: now() });
+  logActivity('notat', _ob.projId, 'Oppdragsbekreftelse lagret som notat');
+  persistAll({ toast: 'Oppdragsbrev lagret som notat på prosjektet ✓' });
 }
 
 // Opprett mapper i OneDrive via Netlify Function (ikke-blokkerende)
@@ -10724,6 +10735,72 @@ Profesjonell og varm tone. Maks 400 ord.`;
 function renderOnboarding() {
   const ob  = _ob;
   const d   = ob.brregData;
+
+  // ── Suksess-visning (etter fullført onboarding) ────────────────────────────
+  if (ob.done) {
+    const proj = DB.projects.find(p => p.id === ob.projId);
+    const letterBlock = ob.letterLoading
+      ? `<div style="display:flex;align-items:center;gap:10px;padding:20px 0;color:var(--text-muted)">
+           <span style="animation:spin 1s linear infinite;display:inline-block">⏳</span>
+           <span>Genererer oppdragsbrev… (tar 15–30 sekunder)</span>
+         </div>`
+      : ob.letter
+        ? `<div style="margin-top:16px">
+             <div style="font-weight:600;font-size:13px;margin-bottom:8px">📄 Utkast oppdragsbekreftelse</div>
+             <pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.7;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;max-height:400px;overflow-y:auto">${escHtml(ob.letter)}</pre>
+             <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+               <button class="btn btn-ghost btn-sm"
+                 onclick="navigator.clipboard.writeText(document.getElementById('ob-done-letter').innerText).then(()=>showToast('Kopiert','success'))">
+                 📋 Kopier tekst
+               </button>
+               <button class="btn btn-ghost btn-sm"
+                 onclick="_obSaveLetter()">
+                 💾 Lagre som notat på prosjektet
+               </button>
+             </div>
+             <pre id="ob-done-letter" style="display:none">${escHtml(ob.letter)}</pre>
+           </div>`
+        : '';
+
+    return `<div style="max-width:720px">
+      <div class="card mb-16" style="border:2px solid var(--green)">
+        <div class="card-body" style="padding:24px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+            <span style="font-size:32px">✅</span>
+            <div>
+              <div style="font-size:18px;font-weight:700;color:var(--text)">Onboarding fullført!</div>
+              <div style="font-size:13px;color:var(--text-muted);margin-top:2px">${escHtml(d?.name || '')}</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:20px">
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+              <div style="font-size:11px;color:var(--text-muted)">Deal ID</div>
+              <div style="font-size:14px;font-weight:700;color:var(--blue);font-family:monospace">${escHtml(proj?.dealId||'')}</div>
+            </div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+              <div style="font-size:11px;color:var(--text-muted)">Prosjekt</div>
+              <div style="font-size:13px;font-weight:600">${escHtml(proj?.name||'')}</div>
+            </div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px">
+              <div style="font-size:11px;color:var(--text-muted)">OneDrive</div>
+              <div style="font-size:12px">📁 Kunder/${escHtml(d?.name||'')}/${escHtml(proj?.dealId||'')}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-primary"
+              onclick="navigate('project-detail',{projectId:'${escHtml(ob.projId||'')}'})"
+              → Gå til prosjektet
+            </button>
+            <button class="btn btn-secondary"
+              onclick="_obReset();render()">
+              + Ny onboarding
+            </button>
+          </div>
+          ${letterBlock}
+        </div>
+      </div>
+    </div>`;
+  }
 
   const oppdragstyper = [
     { key: 'verdivurdering',    label: 'Verdivurdering',      icon: '💰' },
