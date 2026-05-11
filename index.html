@@ -3575,20 +3575,27 @@ function renderProjectDetail(id) {
 
   <!-- DOKUMENTER CARD -->
   <div class="card mb-16" id="doc-card-${p.id}">
-    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div class="card-title">📎 Prosjektdokumenter</div>
-      <div style="display:flex;gap:6px;align-items:center">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         ${(() => {
           const projDocs = DB.documents.filter(d => d.projectId === p.id);
-          return projDocs.length > 0
-            ? `<span style="font-size:11px;color:var(--text-muted)">${projDocs.length} dokument${projDocs.length>1?'er':''}</span>`
-            : '';
+          const folderOpts = (p.folders||[]).map(f =>
+            `<option value="${escHtml(f)}">${escHtml(f)}</option>`).join('');
+          return `
+            ${projDocs.length > 0 ? `<span style="font-size:11px;color:var(--text-muted)">${projDocs.length} dokument${projDocs.length>1?'er':''}</span>` : ''}
+            ${p.folders?.length ? `
+              <select id="doc-folder-${p.id}" class="form-control" style="font-size:11px;padding:3px 6px;height:auto;max-width:160px"
+                title="Velg mappe for neste opplasting">
+                <option value="">📁 Ingen mappe</option>
+                ${folderOpts}
+              </select>` : ''}
+            <label class="btn btn-ghost btn-sm" style="font-size:12px;cursor:pointer;margin:0">
+              ⬆️ Last opp
+              <input type="file" accept=".pdf,.txt,.md,.docx,.csv,.xlsx,.xls" multiple style="display:none"
+                onchange="handleDocUpload(event,'${p.id}')">
+            </label>`;
         })()}
-        <label class="btn btn-ghost btn-sm" style="font-size:12px;cursor:pointer;margin:0">
-          ⬆️ Last opp
-          <input type="file" accept=".pdf,.txt,.md,.docx,.csv" multiple style="display:none"
-            onchange="handleDocUpload(event,'${p.id}')">
-        </label>
       </div>
     </div>
     <div class="card-body" id="doc-list-${p.id}">
@@ -3610,7 +3617,10 @@ function renderProjectDetail(id) {
             <span style="font-size:18px;flex-shrink:0">${_docIcon(doc.type)}</span>
             <div style="flex:1;min-width:0">
               <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(doc.name)}</div>
-              <div style="font-size:11px;color:var(--text-muted)">${fmtDate(doc.createdAt.slice(0,10))} · ${doc.chars ? Math.round(doc.chars/1000)+'k tegn' : 'ingen tekst'}</div>
+              <div style="font-size:11px;color:var(--text-muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <span>${fmtDate(doc.createdAt.slice(0,10))} · ${doc.chars ? Math.round(doc.chars/1000)+'k tegn' : 'ingen tekst'}</span>
+                ${doc.folder ? `<span style="background:rgba(37,99,235,0.08);color:var(--blue);padding:1px 6px;border-radius:4px;font-size:10.5px">📁 ${escHtml(doc.folder)}</span>` : ''}
+              </div>
             </div>
             <button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--blue)"
               onclick="aiSummarizeDoc('${doc.id}','${p.id}')">${_ICON_AI} Sammendrag</button>
@@ -8469,17 +8479,21 @@ function docDrop(event, projectId) {
   if (zone) { zone.style.borderColor = 'transparent'; zone.style.background = ''; }
   const files = Array.from(event.dataTransfer.files);
   if (!files.length) return;
-  _processDocFiles(files, projectId);
+  const folderSel = document.getElementById(`doc-folder-${projectId}`);
+  _processDocFiles(files, projectId, folderSel?.value || '');
 }
 
 async function handleDocUpload(event, projectId) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
-  await _processDocFiles(files, projectId);
+  // Les valgt mappe fra dropdown (finnes bare for prosjekter med mappestruktur)
+  const folderSel = document.getElementById(`doc-folder-${projectId}`);
+  const folder    = folderSel?.value || '';
+  await _processDocFiles(files, projectId, folder);
   event.target.value = '';
 }
 
-async function _processDocFiles(files, projectId) {
+async function _processDocFiles(files, projectId, folder = '') {
   for (const file of files) {
     showToast(`Leser ${file.name}…`, 'info');
     try {
@@ -8498,10 +8512,11 @@ async function _processDocFiles(files, projectId) {
         type:      file.name.split('.').pop().toLowerCase(),
         chars:     text.length,
         text:      docText,
+        folder:    folder || null,
         createdAt: now(),
       });
-      logActivity('notat', projectId, `Dokument lastet opp: ${file.name}`);
-      persistAll({toast: `«${file.name}» lastet opp ✓`});
+      logActivity('notat', projectId, `Dokument lastet opp: ${file.name}${folder ? ' → ' + folder : ''}`);
+      persistAll({toast: `«${file.name}» lastet opp${folder ? ' i ' + folder : ''} ✓`});
     } catch (err) {
       showToast(`Kunne ikke lese ${file.name}: ${err.message}`, 'error');
     }
@@ -10620,6 +10635,9 @@ async function submitOnboarding() {
   logActivity('notat', projId, `Onboarding fullført: klient «${d.name}», prosjekt ${dealId}, mappestruktur og sjekkliste opprettet.`);
   persistAll({ toast: `Klient og prosjekt opprettet for ${d.name} (${dealId})` });
 
+  // Opprett SharePoint-mapper i OneDrive (ikke-blokkerende — viser advarsel ved feil)
+  _createSharePointFolders(d.name, dealId, getStandardFolders());
+
   // Generer oppdragsbrev
   _ob.letterLoading = true;
   render();
@@ -10630,6 +10648,32 @@ async function submitOnboarding() {
   }
   _ob.letterLoading = false;
   render();
+}
+
+// Opprett mapper i OneDrive/SharePoint via Netlify Function (ikke-blokkerende)
+async function _createSharePointFolders(projectName, dealId, folders) {
+  try {
+    const res = await fetch('/.netlify/functions/sharepoint', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ projectName, dealId, folders }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      // Ikke konfiguert ennå — stille feil (ingen env-vars satt)
+      if (res.status === 500 && data.error?.includes('ikke konfigurert')) return;
+      console.warn('SharePoint-feil:', data.error);
+      showToast(`SharePoint: ${data.error}`, 'error');
+      return;
+    }
+    if (data.warnings?.length) {
+      console.warn('SharePoint-advarsler:', data.warnings);
+    }
+    showToast(`📁 OneDrive-mapper opprettet: Kunder/${dealId} – ${projectName}`, 'success');
+  } catch (e) {
+    // Nettverksfeil — appen fungerer fortsatt uten SharePoint
+    console.warn('SharePoint-kall feilet:', e.message);
+  }
 }
 
 // Kall AI og generer oppdragsbrev
