@@ -7686,10 +7686,15 @@ function saveProject(id) {
     DB.projects.push(newProj);
     if (newType) generatePhaseTasks(newProjId, newType);
 
-    // Opprett OneDrive-mapper (ikke-blokkerende)
+    // Opprett OneDrive-mapper + hent årsregnskap (ikke-blokkerende)
     const cust      = DB.customers.find(c => c.id === custId);
     const typeLabel = PROJECT_TYPES.find(t => t.key === newType)?.label || '';
-    if (cust) _createSharePointFolders(cust.name, dealId, typeLabel);
+    if (cust) {
+      _createSharePointFolders(cust.name, dealId, typeLabel);
+      // Hent årsregnskap hvis kunden har org.nr
+      const orgNr = (cust.orgNr || '').replace(/\D/g, '');
+      if (orgNr.length === 9) _fetchAarsregnskap(orgNr, cust.name, newProjId);
+    }
   }
 
   persistAll({toast: id ? 'Prosjekt oppdatert' : 'Prosjekt opprettet'});
@@ -10689,6 +10694,7 @@ async function submitOnboarding() {
 
 // Hent siste 3 årsregnskap fra Brønnøysund og lagre som dokument i 01 Grunnlag
 async function _fetchAarsregnskap(orgNr, companyName, projectId) {
+  showToast(`Henter årsregnskap for ${orgNr}…`, 'info');
   try {
     // Korrekt URL: /{orgNr} — ikke query-parameter
     const res = await fetch(
