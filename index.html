@@ -1594,6 +1594,53 @@ tr:hover td { background: #FAFAFA; }
 }
 
 /* ============================================================
+   ONBOARDING-MODUL
+   ============================================================ */
+.ob-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+@media (max-width: 520px) { .ob-type-grid { grid-template-columns: repeat(2, 1fr); } }
+.ob-type-card {
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: center;
+}
+.ob-type-card:hover  { border-color: var(--blue); background: #EFF6FF; }
+.ob-type-card.selected { border-color: var(--blue); background: #EFF6FF; box-shadow: 0 0 0 2px #BFDBFE; }
+.ob-company-preview {
+  background: #F0F9FF;
+  border: 1.5px solid #BAE6FD;
+  border-radius: 9px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.ob-letter {
+  white-space: pre-wrap;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--text);
+  background: var(--white);
+  padding: 32px 40px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+/* ============================================================
    BRREG SØKEMODUL
    ============================================================ */
 .brreg-search-wrap {
@@ -1811,6 +1858,9 @@ tr:hover td { background: #FAFAFA; }
       </div>
       <div class="nav-item" data-view="customers" onclick="navigate('customers')">
         <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" width="18" height="18" style="flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg></span> Kunder
+      </div>
+      <div class="nav-item" data-view="onboarding" onclick="navigate('onboarding')">
+        <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" width="18" height="18" style="flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 10.374 21c-2.331 0-4.512-.645-6.374-1.766Z" /></svg></span> Onboarding
       </div>
       <div class="nav-item" data-view="followup" onclick="navigate('followup')">
         <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" width="18" height="18" style="flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" /></svg></span> Oppfølging
@@ -2319,13 +2369,14 @@ function navigate(view, extra = {}) {
 
   // Page titles
   const titles = {
-    dashboard: 'Dashboard',
-    projects:  'Prosjekter',
-    customers: 'Kunder',
-    followup:  'Oppfølging',
-    settings:  'Innstillinger',
-    okonomi:   'Økonomi',
-    'project-detail': 'Prosjektdetaljer',
+    dashboard:  'Dashboard',
+    projects:   'Prosjekter',
+    customers:  'Kunder',
+    onboarding: 'Ny klientonboarding',
+    followup:   'Oppfølging',
+    settings:   'Innstillinger',
+    okonomi:    'Økonomi',
+    'project-detail':  'Prosjektdetaljer',
     'customer-detail': 'Kundeprofil',
   };
   document.getElementById('pageTitle').textContent = titles[view] || 'ESS Consulting';
@@ -2354,6 +2405,7 @@ function render() {
     case 'okonomi':          content.innerHTML = renderOkonomi(); break;
     case 'overvakning':      content.innerHTML = renderOvervakning(); break;
     case 'anmerkninger':     content.innerHTML = renderAnmerkninger(); break;
+    case 'onboarding':       content.innerHTML = renderOnboarding(); break;
     case 'settings':         content.innerHTML = renderSettings(); break;
     case 'project-detail':   content.innerHTML = renderProjectDetail(APP.projectDetailId); break;
     case 'customer-detail':  content.innerHTML = renderCustomerDetail(APP.customerDetailId); break;
@@ -7600,10 +7652,13 @@ function closeProject(id) {
    ============================================================ */
 
 const PROJECT_TYPES = [
-  { key: 'verdivurdering',   label: 'Verdivurdering',       icon: '💰' },
-  { key: 'omorganisering',   label: 'Omorganisering',       icon: '🔀' },
-  { key: 'kontrakt',         label: 'Avtale / kontrakt',    icon: '📝' },
-  { key: 'radgivning',       label: 'Generell rådgivning',  icon: '💼' },
+  { key: 'verdivurdering',     label: 'Verdivurdering',         icon: '💰' },
+  { key: 'salg',               label: 'Salgsprosess (M&A)',     icon: '🏷️' },
+  { key: 'kjøp',               label: 'Kjøpsrådgivning (M&A)',  icon: '🎯' },
+  { key: 'generasjonsskifte',  label: 'Generasjonsskifte',      icon: '👨‍👩‍👧' },
+  { key: 'omorganisering',     label: 'Omorganisering',         icon: '🔀' },
+  { key: 'kontrakt',           label: 'Avtale / kontrakt',      icon: '📝' },
+  { key: 'radgivning',         label: 'Generell rådgivning',    icon: '💼' },
 ];
 
 // type = 'oppgave' | 'milepæl'
@@ -7756,6 +7811,159 @@ const PHASE_TEMPLATES = {
           description: 'Lagre rapport og grunnlag.' },
         { name: 'Oppdrag avsluttet',             type: 'milepæl', obligatorisk: true,
           description: 'Oppdrag ferdig levert, fakturert og arkivert.' },
+      ]},
+    ],
+  },
+
+  // ── SALGSPROSESS (M&A) ──────────────────────────────────────────────────────
+  salg: {
+    label: 'Salgsprosess (M&A)', icon: '🏷️',
+    phases: [
+      { nr: 1, name: 'Kartlegging & forberedelse', tasks: [
+        { name: 'Avklare mandat og signere oppdragsbekreftelse', type: 'oppgave', obligatorisk: true,
+          description: 'Avklar salgsmål, prosesstype og honorarstruktur. Signer NDA og engasjementsavtale.' },
+        { name: 'Kartlegge selskapet (regnskap, virksomhet, eierstruktur)', type: 'oppgave', obligatorisk: true,
+          description: 'Gjennomgå 3–5 år regnskap, aksjebok, vedtekter og vesentlige kontrakter.' },
+        { name: 'Normalisere historiske tall og bygge verdiestimat', type: 'oppgave', obligatorisk: true,
+          description: 'EBITDA-normalisering og foreløpig verdiintervall for salgsprosessen.' },
+        { name: 'Avklare salgsmål og prissetting med eier', type: 'oppgave', obligatorisk: true,
+          description: 'Fastsett prismål, minimumspris og prioriterte kjøperprofiler.' },
+        { name: 'Kartlegging komplett', type: 'milepæl', obligatorisk: true,
+          description: 'Selskapet er kartlagt og mandat avklart — klar for IM-fasen.' },
+      ]},
+      { nr: 2, name: 'Informasjonsmemorandum', tasks: [
+        { name: 'Utarbeide Teaser (anonym)', type: 'oppgave', obligatorisk: true,
+          description: 'Kort anonym presentasjon av selskapet for innledende kjøperdialog.' },
+        { name: 'Utarbeide Informasjonsnotat (IM)', type: 'oppgave', obligatorisk: true,
+          description: 'Detaljert presentasjon av virksomhet, historikk, økonomi og vekstpotensial.' },
+        { name: 'Klargjøre datarom', type: 'oppgave', obligatorisk: true,
+          description: 'Strukturer dokumenter i datarom (regnskap, kontrakter, HR, juss).' },
+        { name: 'IM godkjent av selger', type: 'milepæl', obligatorisk: true,
+          description: 'Selger har godkjent IM og datarommet er klart for kjøpere.' },
+      ]},
+      { nr: 3, name: 'Kjøperprosess', tasks: [
+        { name: 'Identifisere og kontakte potensielle kjøpere', type: 'oppgave', obligatorisk: true,
+          description: 'Long-list → short-list. Kontakt strategiske og finansielle kjøpere.' },
+        { name: 'NDA-prosess og distribuere IM', type: 'oppgave', obligatorisk: true,
+          description: 'Innhent signerte NDAer og send IM til shortlistede kjøpere.' },
+        { name: 'Motta og evaluere indikative tilbud (IOI)', type: 'oppgave', obligatorisk: true,
+          description: 'Evaluer priser, vilkår og kjøperprofil. Velg ut til bindende budrunde.' },
+        { name: 'Indikative tilbud evaluert', type: 'milepæl', obligatorisk: true,
+          description: 'Kjøpere valgt ut til bindende budrunde.' },
+      ]},
+      { nr: 4, name: 'Due diligence & forhandling', tasks: [
+        { name: 'Koordinere due diligence-prosess', type: 'oppgave', obligatorisk: true,
+          description: 'Åpne datarom for utvalgte kjøpere. Koordiner spørsmål og svar.' },
+        { name: 'Motta og evaluere bindende bud', type: 'oppgave', obligatorisk: true,
+          description: 'Evaluer pris, betingelser, justeringsmekanismer og garantier.' },
+        { name: 'Forhandle kjøpsavtale (SPA) og vilkår', type: 'oppgave', obligatorisk: true,
+          description: 'Støtte advokat i forhandling av SPA, representasjoner og garantier.' },
+        { name: 'SPA signert', type: 'milepæl', obligatorisk: true,
+          description: 'Kjøpsavtale signert av alle parter.' },
+      ]},
+      { nr: 5, name: 'Closing & avslutning', tasks: [
+        { name: 'Gjennomføre Closing-sjekkliste', type: 'oppgave', obligatorisk: true,
+          description: 'Kontroller alle betingelser (conditions precedent) og closing-dokumenter.' },
+        { name: 'Registrere aksjeoverdragelse i aksjebok', type: 'oppgave', obligatorisk: true,
+          description: 'Oppdater aksjebok og meld endringer til Brønnøysund ved behov.' },
+        { name: 'Fakturere suksesshonoraret', type: 'oppgave', obligatorisk: true,
+          description: 'Utstede sluttfaktura for suksesshonorar basert på gjennomført transaksjon.' },
+        { name: 'Transaksjon gjennomført', type: 'milepæl', obligatorisk: true,
+          description: 'Selskapet er overlevert til ny eier. Oppdrag avsluttet.' },
+      ]},
+    ],
+  },
+
+  // ── KJØPSRÅDGIVNING (M&A) ───────────────────────────────────────────────────
+  'kjøp': {
+    label: 'Kjøpsrådgivning (M&A)', icon: '🎯',
+    phases: [
+      { nr: 1, name: 'Mandat & screening', tasks: [
+        { name: 'Avklare kjøpskriterier og signere oppdragsbekreftelse', type: 'oppgave', obligatorisk: true,
+          description: 'Definer størrelse, bransje, geografi, strategi og prisramme for oppkjøpsmålet.' },
+        { name: 'Kartlegge markedet og identifisere kandidater', type: 'oppgave', obligatorisk: true,
+          description: 'Bygg long-list av aktuelle selskaper basert på kjøpskriterier.' },
+        { name: 'Kandidatliste godkjent', type: 'milepæl', obligatorisk: true,
+          description: 'Kjøper har godkjent long-list — klar for tilnærming.' },
+      ]},
+      { nr: 2, name: 'Analyse & tilnærming', tasks: [
+        { name: 'Kontakte og kvalifisere kandidater', type: 'oppgave', obligatorisk: true,
+          description: 'Innledende dialog, NDA-prosess og innhent IM fra kandidater.' },
+        { name: 'Foreløpig verdsettelse og screening', type: 'oppgave', obligatorisk: true,
+          description: 'Vurder verdi, synergier og strategisk fit for aktuelle kandidater.' },
+        { name: 'Sende Letter of Intent (LoI)', type: 'oppgave', obligatorisk: true,
+          description: 'Forhandle og signe LoI med foretrukket kandidat.' },
+        { name: 'LoI signert', type: 'milepæl', obligatorisk: true,
+          description: 'Letter of Intent akseptert — klar for due diligence.' },
+      ]},
+      { nr: 3, name: 'Due diligence', tasks: [
+        { name: 'Finansiell due diligence', type: 'oppgave', obligatorisk: true,
+          description: 'Gjennomgå regnskap, normalisere EBITDA og validere finansielle prognoser.' },
+        { name: 'Koordinere legal due diligence (med advokat)', type: 'oppgave', obligatorisk: true,
+          description: 'Gjennomgå kontrakter, rettigheter, forpliktelser og risikoforhold.' },
+        { name: 'DD-rapport og bindende bud', type: 'oppgave', obligatorisk: true,
+          description: 'Oppsummer DD-funn og juster budpris ved behov. Send bindende bud.' },
+        { name: 'Bindende bud akseptert', type: 'milepæl', obligatorisk: true,
+          description: 'Selger har akseptert bindende bud — klar for SPA-forhandling.' },
+      ]},
+      { nr: 4, name: 'Forhandling & Closing', tasks: [
+        { name: 'Forhandle kjøpsavtale (SPA)', type: 'oppgave', obligatorisk: true,
+          description: 'Støtte advokat i forhandling av SPA, garantier og betingelser.' },
+        { name: 'Finansieringsplan', type: 'oppgave', obligatorisk: false,
+          description: 'Koordinere finansiering (egenkapital, lån mv.) ved behov.' },
+        { name: 'Closing og registrering', type: 'oppgave', obligatorisk: true,
+          description: 'Gjennomfør Closing, oppdater aksjebok og meld til Brønnøysund.' },
+        { name: 'Fakturere oppdrag', type: 'oppgave', obligatorisk: true,
+          description: 'Utstede sluttfaktura.' },
+        { name: 'Transaksjon gjennomført', type: 'milepæl', obligatorisk: true,
+          description: 'Oppkjøp gjennomført. Oppdrag avsluttet.' },
+      ]},
+    ],
+  },
+
+  // ── GENERASJONSSKIFTE ────────────────────────────────────────────────────────
+  generasjonsskifte: {
+    label: 'Generasjonsskifte', icon: '👨‍👩‍👧',
+    phases: [
+      { nr: 1, name: 'Analyse & rådgivning', tasks: [
+        { name: 'Avklare mål og signere oppdragsbekreftelse', type: 'oppgave', obligatorisk: true,
+          description: 'Forstå eierens mål: hvem skal overta, tidshorisont og hensyn (likviditet, likebehandling).' },
+        { name: 'Kartlegge nåværende eierstruktur', type: 'oppgave', obligatorisk: true,
+          description: 'Tegn opp struktur: selskaper, aksjonærer, eiendeler, gjeld og latent skatt.' },
+        { name: 'Verdivurdering av selskapet', type: 'oppgave', obligatorisk: true,
+          description: 'Beregn verdi som grunnlag for generasjonsskiftemodellen.' },
+        { name: 'Identifisere generasjonsskiftemodell', type: 'oppgave', obligatorisk: true,
+          description: 'Vurder: gavesalg, generasjonslån, fisjonsmodell, holdingstruktur, eksternt salg m.fl.' },
+        { name: 'Skattemessige konsekvenser vurdert', type: 'milepæl', obligatorisk: true,
+          description: 'Foreslått modell og skatteeffekter gjennomgått med kunde og evt. revisor.' },
+      ]},
+      { nr: 2, name: 'Planlegging & strukturering', tasks: [
+        { name: 'Utarbeide plan for gjennomføring', type: 'oppgave', obligatorisk: true,
+          description: 'Detaljert plan med trinn, tidsplan og ansvar for alle parter.' },
+        { name: 'Eventuell omstrukturering (holding/fisjon)', type: 'oppgave', obligatorisk: false,
+          description: 'Gjennomfør nødvendig omstrukturering før overdragelsen.' },
+        { name: 'Plan godkjent av alle parter', type: 'milepæl', obligatorisk: true,
+          description: 'Alle berørte parter har godkjent planen.' },
+      ]},
+      { nr: 3, name: 'Gjennomføring', tasks: [
+        { name: 'Overføre aksjer/andeler', type: 'oppgave', obligatorisk: true,
+          description: 'Gjennomfør overdragelsen (gavebrev, kjøpekontrakt, aksjeoverdragelse).' },
+        { name: 'Utarbeide GF-dokumenter og vedtektsendringer', type: 'oppgave', obligatorisk: true,
+          description: 'Innkalling, GF-protokoll, nye vedtekter og aksjonæravtale ved behov.' },
+        { name: 'Registrere i Brønnøysund', type: 'oppgave', obligatorisk: true,
+          description: 'Meld eierskap og vedtektsendringer til Foretaksregisteret.' },
+        { name: 'Overdragelse registrert', type: 'milepæl', obligatorisk: true,
+          description: 'Ny eierstruktur er registrert og rettslig gyldig.' },
+      ]},
+      { nr: 4, name: 'Avslutning', tasks: [
+        { name: 'Oppsummerende gjennomgang med kunde', type: 'oppgave', obligatorisk: true,
+          description: 'Gjennomgå sluttresultat, ny struktur og evt. løpende råd.' },
+        { name: 'Fakturere oppdrag', type: 'oppgave', obligatorisk: true,
+          description: 'Utstede sluttfaktura.' },
+        { name: 'Arkivere dokumentasjon', type: 'oppgave', obligatorisk: true,
+          description: 'Lagre all dokumentasjon fra prosessen.' },
+        { name: 'Oppdrag avsluttet', type: 'milepæl', obligatorisk: true,
+          description: 'Generasjonsskiftet er gjennomført og oppdraget avsluttet.' },
       ]},
     ],
   },
@@ -10062,6 +10270,406 @@ document.addEventListener('keydown', (e) => {
     closeConfirm();
   }
 });
+
+/* ============================================================
+   KLIENTONBOARDING
+   ============================================================ */
+
+// Tilstand for onboarding-flyten (tilbakestilles ved navigate til ny klient)
+let _ob = {
+  brregData:      null,   // data fra Brønnøysundregistrene
+  brregError:     null,
+  assignmentType: null,   // valgt oppdragstype
+  contact: '', email: '', phone: '',
+  background: '',
+  startDate: new Date().toISOString().slice(0, 10),
+  honorar: '', feeType: 'fastpris',
+  letter:         null,   // generert oppdragsbrev
+  letterLoading:  false,
+};
+
+function _obReset() {
+  _ob = {
+    brregData: null, brregError: null, assignmentType: null,
+    contact: '', email: '', phone: '', background: '',
+    startDate: new Date().toISOString().slice(0, 10),
+    honorar: '', feeType: 'fastpris',
+    letter: null, letterLoading: false,
+  };
+}
+
+// Les skjemafeltene tilbake til _ob (kalles før re-render)
+function _obSaveForm() {
+  if (document.getElementById('ob-contact')) {
+    _ob.contact    = document.getElementById('ob-contact')?.value  ?? _ob.contact;
+    _ob.email      = document.getElementById('ob-email')?.value    ?? _ob.email;
+    _ob.phone      = document.getElementById('ob-phone')?.value    ?? _ob.phone;
+    _ob.background = document.getElementById('ob-background')?.value ?? _ob.background;
+    _ob.startDate  = document.getElementById('ob-startdate')?.value  ?? _ob.startDate;
+    _ob.honorar    = document.getElementById('ob-honorar')?.value    ?? _ob.honorar;
+    _ob.feeType    = document.getElementById('ob-feeType')?.value    ?? _ob.feeType;
+  }
+}
+
+// Slå opp org.nr i Brønnøysundregistrene
+async function lookupBrregOnboarding() {
+  const inp = document.getElementById('ob-orgnr');
+  if (!inp) return;
+  const raw = inp.value.replace(/\D/g, '');
+  if (raw.length !== 9) {
+    _ob.brregError = 'Org.nr må være nøyaktig 9 siffer';
+    render(); return;
+  }
+  _ob.brregError = null;
+  const btn = document.getElementById('ob-lookup-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Henter…'; }
+
+  try {
+    const res = await fetch(`https://data.brreg.no/enhetsregisteret/api/enheter/${raw}`);
+    if (res.status === 404) throw new Error(`Fant ingen enhet med org.nr ${raw}`);
+    if (!res.ok)            throw new Error(`Brreg svarte med HTTP ${res.status}`);
+    const d = await res.json();
+
+    const adr = d.forretningsadresse;
+    const adrStr = adr
+      ? [[adr.adresse?.[0], [adr.postnummer, adr.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join('')
+      : '';
+
+    _ob.brregData = {
+      orgNr:     raw,
+      name:      d.navn || '',
+      orgForm:   d.organisasjonsform?.beskrivelse || '',
+      founded:   d.stiftelsesdato ? d.stiftelsesdato.slice(0, 4) : '',
+      address:   adrStr,
+      nace:      d.naeringskode1?.beskrivelse || '',
+      employees: d.antallAnsatte ?? null,
+      ceo:       null,
+    };
+
+    // Hent daglig leder fra roller-APIet (beste forsøk)
+    try {
+      const rRes = await fetch(`https://data.brreg.no/enhetsregisteret/api/enheter/${raw}/roller`);
+      if (rRes.ok) {
+        const rData = await rRes.json();
+        const dagl = (rData.rollegrupper || [])
+          .flatMap(g => g.roller || [])
+          .find(r => r.type?.kode === 'DAGL');
+        if (dagl?.person?.navn) {
+          const n = dagl.person.navn;
+          _ob.brregData.ceo = [n.fornavn, n.mellomnavn, n.etternavn].filter(Boolean).join(' ');
+        }
+      }
+    } catch (_) { /* roller-APIet er valgfritt */ }
+
+  } catch (e) {
+    _ob.brregError = e.message;
+    _ob.brregData  = null;
+  }
+  render();
+}
+
+// Velg oppdragstype (klikk på kort — ingen full re-render)
+function obSelectType(key) {
+  _ob.assignmentType = key;
+  document.querySelectorAll('.ob-type-card').forEach(el => {
+    el.classList.toggle('selected', el.dataset.type === key);
+  });
+}
+
+// Opprett kunde + prosjekt + generer oppdragsbrev
+async function submitOnboarding() {
+  _obSaveForm();
+  const d = _ob.brregData;
+  if (!d)                    { showToast('Slå opp et selskap først', 'error'); return; }
+  if (!_ob.contact.trim())   { showToast('Kontaktperson er påkrevd', 'error'); return; }
+  if (!_ob.assignmentType)   { showToast('Velg oppdragstype', 'error'); return; }
+
+  // Mapping: onboarding-type → PROJECT_TYPES-nøkkel + PHASE_TEMPLATES-nøkkel
+  const typeMap = {
+    verdivurdering: 'verdivurdering',
+    salg:           'salg',
+    kjøp:           'kjøp',
+    generasjonsskifte: 'generasjonsskifte',
+    omorganisering: 'omorganisering',
+    kontrakt:       'kontrakt',
+    annet:          'radgivning',
+  };
+  const projTypeKey = typeMap[_ob.assignmentType] || 'radgivning';
+
+  const typeLabels = {
+    verdivurdering:    'Verdivurdering',
+    salg:              'Salgsprosess',
+    kjøp:              'Kjøpsrådgivning',
+    generasjonsskifte: 'Generasjonsskifte',
+    omorganisering:    'Omorganisering',
+    kontrakt:          'Avtale / kontrakt',
+    annet:             'Rådgivning',
+  };
+
+  // Finn eller opprett kunden
+  let customer = DB.customers.find(c => normalizeOrgNr(c.orgNr) === d.orgNr);
+  if (!customer) {
+    customer = {
+      id:        uid(),
+      name:      d.name,
+      orgNr:     d.orgNr,
+      contact:   _ob.contact.trim(),
+      email:     _ob.email.trim(),
+      phone:     _ob.phone.trim(),
+      notes:     [d.address && `Adresse: ${d.address}`, d.nace && `Bransje: ${d.nace}`].filter(Boolean).join('\n'),
+      createdAt: now(),
+    };
+    DB.customers.push(customer);
+  } else {
+    // Oppdater kontaktinfo
+    if (_ob.contact.trim()) customer.contact = _ob.contact.trim();
+    if (_ob.email.trim())   customer.email   = _ob.email.trim();
+    if (_ob.phone.trim())   customer.phone   = _ob.phone.trim();
+  }
+
+  // Opprett prosjektet
+  const projId = uid();
+  DB.projects.push({
+    id:               projId,
+    customerId:       customer.id,
+    projectType:      projTypeKey,
+    name:             `${typeLabels[_ob.assignmentType]} – ${d.name}`,
+    description:      _ob.background.trim(),
+    consultant:       '',
+    startDate:        _ob.startDate,
+    endDate:          '',
+    status:           'ikke-startet',
+    progress:         0,
+    honorarEstimert:  _ob.honorar ? Number(_ob.honorar) : null,
+    honorarAvtalt:    null,
+    honorarFakturert: null,
+    timesats:         2600,
+    createdAt:        now(),
+    updatedAt:        now(),
+  });
+  generatePhaseTasks(projId, projTypeKey);
+  persistAll({ toast: `Klient og prosjekt opprettet for ${d.name}` });
+
+  // Generer oppdragsbrev
+  _ob.letterLoading = true;
+  render();
+  try {
+    await _obGenerateLetter(customer, projTypeKey, typeLabels[_ob.assignmentType]);
+  } catch (e) {
+    showToast('Klarte ikke generere oppdragsbrev: ' + e.message, 'error');
+  }
+  _ob.letterLoading = false;
+  render();
+}
+
+// Kall AI og generer oppdragsbrev
+async function _obGenerateLetter(customer, projTypeKey, oppdragLabel) {
+  const feeLabels = { fastpris: 'fast pris', lop: 'løpende (time/dag)', suksess: 'suksesshonorar', kombinert: 'kombinert fast pris + suksesshonorar' };
+  const today = new Date().toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' });
+  const honorarTekst = _ob.honorar
+    ? `NOK ${Number(_ob.honorar).toLocaleString('nb-NO')} (${feeLabels[_ob.feeType] || _ob.feeType})`
+    : feeLabels[_ob.feeType] || _ob.feeType;
+
+  const prompt = `Du er Erlend Synnes-Sandberg, daglig leder i ESS Consulting AS (M&A og finansiell rådgivning, Hamar).
+Skriv en profesjonell oppdragsbekreftelse på norsk bokmål til følgende klient.
+
+KLIENTINFORMASJON:
+- Selskap: ${customer.name} (org.nr ${customer.orgNr})
+${_ob.brregData?.address ? `- Adresse: ${_ob.brregData.address}` : ''}
+${_ob.brregData?.nace ? `- Bransje: ${_ob.brregData.nace}` : ''}
+- Kontaktperson: ${customer.contact}${customer.email ? ' (' + customer.email + ')' : ''}
+
+OPPDRAG:
+- Type: ${oppdragLabel}
+- Bakgrunn: ${_ob.background.trim() || '(ikke oppgitt)'}
+- Estimert oppstart: ${_ob.startDate}
+- Honorar: ${honorarTekst}
+
+BREVETS INNHOLD (i denne rekkefølgen):
+1. Brevhode: Dato (${today}), «Til: ${customer.contact} / ${customer.name}», Emne
+2. Innledning: Takk for tilliten og bekreft at ESS Consulting AS påtar seg oppdraget
+3. Oppdragsbeskrivelse: Konkret hva vi skal levere (2–4 setninger tilpasset oppdragstypen)
+4. Honorar og betalingsbetingelser: Honorarstruktur og 30 dagers betalingsfrist
+5. Konfidensialitet: Én kort setning om gjensidig taushetsplikt
+6. Avslutning: Oppfordring om å kontakte oss ved spørsmål
+7. Signaturfelt:
+   ESS Consulting AS
+   Erlend Synnes-Sandberg
+   (Underskrift)
+
+   Akseptert av oppdragsgiver:
+   ${customer.name}
+   ${customer.contact}
+   (Underskrift og dato)
+
+KRAV: Ren tekst med linjeskift — ingen markdown, ingen asterisker, ingen overskriftssymboler.
+Profesjonell og varm tone. Maks 400 ord.`;
+
+  _ob.letter = await callAI(prompt, 900);
+}
+
+// Rendrer onboarding-visningen
+function renderOnboarding() {
+  const ob  = _ob;
+  const d   = ob.brregData;
+
+  const oppdragstyper = [
+    { key: 'verdivurdering',    label: 'Verdivurdering',      icon: '💰' },
+    { key: 'salg',              label: 'Salgsprosess',         icon: '🏷️' },
+    { key: 'kjøp',              label: 'Kjøpsrådgivning',      icon: '🎯' },
+    { key: 'generasjonsskifte', label: 'Generasjonsskifte',    icon: '👨‍👩‍👧' },
+    { key: 'omorganisering',    label: 'Omorganisering',       icon: '🔀' },
+    { key: 'kontrakt',          label: 'Avtale / kontrakt',    icon: '📝' },
+    { key: 'annet',             label: 'Annet',                icon: '💼' },
+  ];
+
+  // ── Steg 1: Org.nr-oppslag ─────────────────────────────────────────────────
+  const lookupSection = `
+  <div class="card mb-16">
+    <div class="card-header"><div class="card-title">🔍 Slå opp selskap i Brønnøysund</div></div>
+    <div class="card-body" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div class="form-group" style="flex:1;min-width:180px;margin:0">
+        <label>Organisasjonsnummer</label>
+        <input class="form-control" id="ob-orgnr" placeholder="915 137 458" inputmode="numeric" maxlength="12"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();lookupBrregOnboarding()}">
+      </div>
+      <button class="btn btn-primary" id="ob-lookup-btn" onclick="lookupBrregOnboarding()">Hent firmainfo</button>
+      ${d ? `<button class="btn btn-ghost" onclick="_obReset();render()">✕ Nullstill</button>` : ''}
+    </div>
+    ${ob.brregError ? `<div style="color:var(--red);font-size:13px;padding:0 24px 16px">${escHtml(ob.brregError)}</div>` : ''}
+  </div>`;
+
+  if (!d) return `<div style="max-width:720px">${lookupSection}</div>`;
+
+  // ── Steg 2: Forhåndsvisning av Brreg-data ─────────────────────────────────
+  const preview = `
+  <div class="ob-company-preview mb-16">
+    <div style="flex:1">
+      <div style="font-size:16px;font-weight:700;color:var(--text)">${escHtml(d.name)}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
+        Org.nr ${escHtml(d.orgNr)}
+        ${d.orgForm   ? ' · ' + escHtml(d.orgForm)   : ''}
+        ${d.founded   ? ' · Stiftet ' + escHtml(d.founded) : ''}
+        ${d.employees !== null ? ' · ' + d.employees + ' ansatte' : ''}
+      </div>
+      <div style="display:flex;gap:18px;margin-top:10px;flex-wrap:wrap;font-size:13px">
+        ${d.address  ? `<span><span style="color:var(--text-muted)">Adresse:</span> ${escHtml(d.address)}</span>` : ''}
+        ${d.nace     ? `<span><span style="color:var(--text-muted)">Bransje:</span> ${escHtml(d.nace)}</span>` : ''}
+        ${d.ceo      ? `<span><span style="color:var(--text-muted)">Daglig leder:</span> ${escHtml(d.ceo)}</span>` : ''}
+      </div>
+    </div>
+    <span style="color:#0EA5E9;font-size:20px">✓</span>
+  </div>`;
+
+  // ── Steg 3: Oppdragsskjema ─────────────────────────────────────────────────
+  const typeCards = oppdragstyper.map(t => `
+    <div class="ob-type-card${ob.assignmentType===t.key?' selected':''}" data-type="${t.key}"
+         onclick="obSelectType('${t.key}')">
+      <span style="font-size:22px">${t.icon}</span>
+      <span style="font-size:12px;font-weight:500;line-height:1.2">${t.label}</span>
+    </div>`).join('');
+
+  const feeLabels = { fastpris: 'Fast pris', lop: 'Løpende (tim./dag)', suksess: 'Suksesshonorar', kombinert: 'Kombinert' };
+
+  const formSection = `
+  <div class="card mb-16">
+    <div class="card-header"><div class="card-title">📋 Oppdragsdetaljer</div></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:18px">
+
+      <div class="form-group" style="margin:0">
+        <label>Kontaktperson hos klienten *</label>
+        <div class="form-row" style="gap:10px">
+          <input class="form-control" id="ob-contact" placeholder="Navn" style="flex:2"
+            value="${escHtml(ob.contact || d.ceo || '')}">
+          <input class="form-control" id="ob-email" type="email" placeholder="E-post" style="flex:2"
+            value="${escHtml(ob.email)}">
+          <input class="form-control" id="ob-phone" type="tel" placeholder="Mobil" style="flex:1"
+            value="${escHtml(ob.phone)}">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label>Oppdragstype *</label>
+        <div class="ob-type-grid">${typeCards}</div>
+      </div>
+
+      <div class="form-group" style="margin:0">
+        <label>Kort bakgrunn / problemstilling</label>
+        <textarea class="form-control" id="ob-background" rows="3"
+          placeholder="Beskriv bakgrunn, hva klienten ønsker å oppnå og eventuelle særlige forhold…">${escHtml(ob.background)}</textarea>
+      </div>
+
+      <div class="form-row" style="gap:10px">
+        <div class="form-group" style="flex:1;margin:0">
+          <label>Estimert oppstart</label>
+          <input class="form-control" id="ob-startdate" type="date" value="${escHtml(ob.startDate)}">
+        </div>
+        <div class="form-group" style="flex:1;margin:0">
+          <label>Estimert honorar (NOK)</label>
+          <input class="form-control" id="ob-honorar" type="number" placeholder="150 000"
+            value="${escHtml(ob.honorar)}">
+        </div>
+        <div class="form-group" style="flex:1;margin:0">
+          <label>Honorarstruktur</label>
+          <select class="form-control" id="ob-feeType">
+            ${Object.entries(feeLabels).map(([k,v]) =>
+              `<option value="${k}"${ob.feeType===k?' selected':''}>${v}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions" style="justify-content:flex-end;gap:10px">
+        <button class="btn btn-secondary" onclick="_obReset();render()">Avbryt</button>
+        <button class="btn btn-primary" onclick="_obSaveForm();submitOnboarding()" id="ob-submit-btn">
+          ✦&nbsp; Opprett klient &amp; generer oppdragsbrev
+        </button>
+      </div>
+    </div>
+  </div>`;
+
+  // ── Steg 4: Oppdragsbrev (vises etter generering) ─────────────────────────
+  const loadingSection = ob.letterLoading ? `
+  <div class="card mb-16">
+    <div class="card-body" style="text-align:center;padding:32px;color:var(--text-muted)">
+      <div style="font-size:22px;margin-bottom:8px">✦</div>
+      <div style="font-size:14px">Genererer oppdragsbrev…</div>
+    </div>
+  </div>` : '';
+
+  const letterSection = ob.letter ? `
+  <div class="card mb-16">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+      <div class="card-title">📄 Utkast oppdragsbekreftelse</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm"
+          onclick="navigator.clipboard.writeText(document.getElementById('ob-letter-pre').innerText).then(()=>showToast('Kopiert til utklippstavle','success'))">
+          📋 Kopier tekst
+        </button>
+        <button class="btn btn-primary btn-sm"
+          onclick="navigate('project-detail',{projectId:DB.projects.filter(p=>DB.customers.find(c=>c.orgNr==='${escHtml(d.orgNr)}')?.id===p.customerId).at(-1)?.id})">
+          → Gå til prosjektet
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <pre id="ob-letter-pre" class="ob-letter">${escHtml(ob.letter)}</pre>
+    </div>
+  </div>` : '';
+
+  return `<div style="max-width:780px">
+    <div style="margin-bottom:20px">
+      <div style="font-size:20px;font-weight:700;color:var(--text)">Ny klientonboarding</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:4px">
+        Slå opp selskapet i Brønnøysund, fyll inn oppdragsdetaljer og generer oppdragsbrev automatisk.
+      </div>
+    </div>
+    ${lookupSection}
+    ${preview}
+    ${formSection}
+    ${loadingSection}
+    ${letterSection}
+  </div>`;
+}
 
 // Auth-tilstandslytter — styrer hele app-flyten (venter på Supabase-init)
 let _appInitialized = false;
