@@ -10636,7 +10636,7 @@ async function submitOnboarding() {
   persistAll({ toast: `Klient og prosjekt opprettet for ${d.name} (${dealId})` });
 
   // Opprett SharePoint-mapper i OneDrive (ikke-blokkerende — viser advarsel ved feil)
-  _createSharePointFolders(d.name, dealId, getStandardFolders());
+  _createSharePointFolders(d.name, dealId, typeLabels[_ob.assignmentType] || '');
 
   // Generer oppdragsbrev
   _ob.letterLoading = true;
@@ -10650,26 +10650,24 @@ async function submitOnboarding() {
   render();
 }
 
-// Opprett mapper i OneDrive/SharePoint via Netlify Function (ikke-blokkerende)
-async function _createSharePointFolders(projectName, dealId, folders) {
+// Opprett mapper i OneDrive via Netlify Function (ikke-blokkerende)
+// Struktur: Kunder/{customerName}/{dealId} {typeLabel}
+async function _createSharePointFolders(customerName, dealId, typeLabel) {
   try {
     const res = await fetch('/.netlify/functions/sharepoint', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ projectName, dealId, folders }),
+      body:    JSON.stringify({ customerName, dealId, typeLabel }),
     });
     const data = await res.json();
     if (!res.ok) {
-      // Ikke konfiguert ennå — stille feil (ingen env-vars satt)
+      // Ikke konfigurert ennå — stille feil (ingen env-vars satt)
       if (res.status === 500 && data.error?.includes('ikke konfigurert')) return;
       console.warn('SharePoint-feil:', data.error);
       showToast(`SharePoint: ${data.error}`, 'error');
       return;
     }
-    if (data.warnings?.length) {
-      console.warn('SharePoint-advarsler:', data.warnings);
-    }
-    showToast(`📁 OneDrive-mapper opprettet: Kunder/${dealId} – ${projectName}`, 'success');
+    showToast(`📁 OneDrive-mapper opprettet: Kunder/${customerName}/${dealId}`, 'success');
   } catch (e) {
     // Nettverksfeil — appen fungerer fortsatt uten SharePoint
     console.warn('SharePoint-kall feilet:', e.message);
