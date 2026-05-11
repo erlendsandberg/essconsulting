@@ -1717,6 +1717,37 @@ tr:hover td { background: #FAFAFA; }
 }
 
 /* ============================================================
+   PRIORITET OG MAPPESTRUKTUR
+   ============================================================ */
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.priority-badge.høy    { background: rgba(239,68,68,0.1); color: #b91c1c; }
+.priority-badge.middels { background: rgba(234,179,8,0.1); color: #92400e; }
+.priority-badge.lav    { background: rgba(34,197,94,0.1); color: #166534; }
+
+.folder-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px;
+}
+.folder-item {
+  font-size: 12.5px;
+  color: var(--text);
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* ============================================================
    SCROLLBAR
    ============================================================ */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -2722,7 +2753,10 @@ function renderProjects() {
     const c = getCustomer(p.customerId);
     const od = p.status !== 'avsluttet' && p.endDate && isOverdue(p.endDate);
     rows += `<tr>
-      <td><span class="td-link" onclick="navigate('project-detail',{projectId:'${p.id}'})">${escHtml(p.name)}</span></td>
+      <td>
+        <span class="td-link" onclick="navigate('project-detail',{projectId:'${p.id}'})">${escHtml(p.name)}</span>
+        ${p.dealId ? `<div style="font-size:11px;color:var(--blue);font-family:monospace;margin-top:2px">${escHtml(p.dealId)}</div>` : ''}
+      </td>
       <td><span class="td-link" onclick="navigate('customer-detail',{customerId:'${p.customerId}'})">${c ? escHtml(c.name) : '–'}</span></td>
       <td>${badge(p.status)}</td>
       <td>
@@ -3362,9 +3396,11 @@ function renderProjectDetail(id) {
     <div class="card-header">
       <div>
         <div class="card-title">${escHtml(p.name)}</div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap">
           ${c ? `<span class="text-muted text-sm">${escHtml(c.name)}</span>` : ''}
           <span class="proj-type-badge">${typeLabel}</span>
+          ${p.dealId ? `<span style="font-family:monospace;font-size:11px;font-weight:700;color:var(--blue);background:rgba(37,99,235,0.08);padding:2px 7px;border-radius:5px">${escHtml(p.dealId)}</span>` : ''}
+          ${p.priority === 'høy' ? `<span class="priority-badge høy">🔴 Høy</span>` : p.priority === 'lav' ? `<span class="priority-badge lav">🟢 Lav</span>` : ''}
         </div>
       </div>
       <div class="flex gap-8 items-center flex-wrap">
@@ -3408,7 +3444,10 @@ function renderProjectDetail(id) {
 
       <div class="detail-grid" style="margin-top:14px">
         ${p.description ? `<div class="detail-field" style="grid-column:1/-1"><label>Beskrivelse</label><p>${escHtml(p.description)}</p></div>` : ''}
+        ${p.dealId ? `<div class="detail-field"><label>Deal ID</label><p style="font-family:monospace;font-size:13px;font-weight:600;color:var(--blue)">${escHtml(p.dealId)}</p></div>` : ''}
         <div class="detail-field"><label>Ansvarlig</label><p>${escHtml(p.consultant)||'–'}</p></div>
+        ${p.priority ? `<div class="detail-field"><label>Prioritet</label><p><span class="priority-badge ${escHtml(p.priority)}">${p.priority==='lav'?'🟢 Lav':p.priority==='høy'?'🔴 Høy':'🟡 Middels'}</span></p></div>` : ''}
+        ${p.leadSource ? `<div class="detail-field"><label>Leadkilde</label><p>${escHtml({nettverk:'Nettverk',kaldinntakt:'Kald inntakt',anbefaling:'Anbefaling',eksisterende:'Eksisterende klient',inbound:'Inbound / henvendelse',annet:'Annet'}[p.leadSource]||p.leadSource)}</p></div>` : ''}
         <div class="detail-field"><label>Oppstartsdato</label><p>${fmtDate(p.startDate)}</p></div>
         <div class="detail-field"><label>Sluttdato</label><p class="${od?'task-due-overdue':''}">${fmtDate(p.endDate)}</p></div>
         <div class="detail-field"><label>Sist oppdatert</label><p>${fmtDate(p.updatedAt)}</p></div>
@@ -3458,6 +3497,17 @@ function renderProjectDetail(id) {
       <button class="btn btn-ghost btn-sm" onclick="openProjectModal('${p.id}')">Legg til</button>
     </div>
   </div>`}
+
+  <!-- MAPPESTRUKTUR -->
+  ${p.folders && p.folders.length ? `
+  <div class="card mb-16">
+    <div class="card-header"><div class="card-title">📁 Mappestruktur</div></div>
+    <div class="card-body">
+      <div class="folder-list">
+        ${p.folders.map(f => `<div class="folder-item">📂 ${escHtml(f)}</div>`).join('')}
+      </div>
+    </div>
+  </div>` : ''}
 
   <!-- STATUS QUICK-UPDATE -->
   <div class="card mb-16">
@@ -7999,6 +8049,66 @@ function generatePhaseTasks(projectId, typeKey) {
   });
 }
 
+// Generer neste Deal ID — format DEAL-YYYY-0001, auto-inkrementert per år
+function generateDealId() {
+  const year   = new Date().getFullYear();
+  const prefix = `DEAL-${year}-`;
+  const nums   = DB.projects
+    .filter(p => p.dealId && p.dealId.startsWith(prefix))
+    .map(p => parseInt(p.dealId.slice(prefix.length), 10))
+    .filter(n => !isNaN(n));
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  return prefix + String(next).padStart(4, '0');
+}
+
+// Standard mappestruktur for alle M&A/rådgivningsoppdrag
+function getStandardFolders() {
+  return [
+    '01 Admin',
+    '02 Økonomi',
+    '03 Juridisk',
+    '04 Kommersielt',
+    '05 Ledelse',
+    '06 Verdivurdering',
+    '07 Markedsmateriell',
+    '08 Due diligence',
+    '09 Closing',
+  ];
+}
+
+// Opprett standard onboarding-sjekkliste for nytt prosjekt
+function generateOnboardingTasks(projectId) {
+  const tasks = [
+    'Bekreft oppdragsomfang',
+    'Verifiser selskapsopplysninger',
+    'Innhent siste årsregnskap',
+    'Innhent løpende år management accounts',
+    'Innhent aksjonærinformasjon',
+    'Opprett internt prosjektnotat',
+    'Gjennomfør innledende rådgivergjennomgang',
+    'Planlegg oppstartsmøte',
+    'Bekreft tilgang til datarom / mappestruktur',
+    'Sett neste handlingsdato',
+  ];
+  tasks.forEach(name => {
+    DB.tasks.push({
+      id:          uid(),
+      createdAt:   now(),
+      projectId,
+      name,
+      description: '',
+      type:        'oppgave',
+      fase:        null,
+      faseName:    null,
+      obligatorisk: true,
+      assignee:    '',
+      dueDate:     '',
+      status:      'ikke-startet',
+      _manual:     true,
+    });
+  });
+}
+
 /**
  * Beregn gjeldende fase og neste steg for et prosjekt.
  */
@@ -10277,16 +10387,19 @@ document.addEventListener('keydown', (e) => {
 
 // Tilstand for onboarding-flyten (tilbakestilles ved navigate til ny klient)
 let _ob = {
-  brregData:      null,   // data fra Brønnøysundregistrene
-  brregResults:   null,   // navnesøk-treff (liste)
-  brregError:     null,
-  assignmentType: null,   // valgt oppdragstype
+  brregData:           null,   // data fra Brønnøysundregistrene
+  brregResults:        null,   // navnesøk-treff (liste)
+  brregError:          null,
+  assignmentType:      null,   // valgt oppdragstype
   contact: '', email: '', phone: '',
   background: '',
-  startDate: new Date().toISOString().slice(0, 10),
+  startDate:           new Date().toISOString().slice(0, 10),
   honorar: '', feeType: 'fastpris',
-  letter:         null,   // generert oppdragsbrev
-  letterLoading:  false,
+  leadSource:          '',
+  priority:            'middels',
+  responsibleAdvisor:  'Erlend Synnes-Sandberg',
+  letter:              null,   // generert oppdragsbrev
+  letterLoading:       false,
 };
 
 function _obReset() {
@@ -10295,6 +10408,8 @@ function _obReset() {
     contact: '', email: '', phone: '', background: '',
     startDate: new Date().toISOString().slice(0, 10),
     honorar: '', feeType: 'fastpris',
+    leadSource: '', priority: 'middels',
+    responsibleAdvisor: 'Erlend Synnes-Sandberg',
     letter: null, letterLoading: false,
   };
 }
@@ -10302,13 +10417,16 @@ function _obReset() {
 // Les skjemafeltene tilbake til _ob (kalles før re-render)
 function _obSaveForm() {
   if (document.getElementById('ob-contact')) {
-    _ob.contact    = document.getElementById('ob-contact')?.value  ?? _ob.contact;
-    _ob.email      = document.getElementById('ob-email')?.value    ?? _ob.email;
-    _ob.phone      = document.getElementById('ob-phone')?.value    ?? _ob.phone;
-    _ob.background = document.getElementById('ob-background')?.value ?? _ob.background;
-    _ob.startDate  = document.getElementById('ob-startdate')?.value  ?? _ob.startDate;
-    _ob.honorar    = document.getElementById('ob-honorar')?.value    ?? _ob.honorar;
-    _ob.feeType    = document.getElementById('ob-feeType')?.value    ?? _ob.feeType;
+    _ob.contact             = document.getElementById('ob-contact')?.value    ?? _ob.contact;
+    _ob.email               = document.getElementById('ob-email')?.value      ?? _ob.email;
+    _ob.phone               = document.getElementById('ob-phone')?.value      ?? _ob.phone;
+    _ob.background          = document.getElementById('ob-background')?.value ?? _ob.background;
+    _ob.startDate           = document.getElementById('ob-startdate')?.value  ?? _ob.startDate;
+    _ob.honorar             = document.getElementById('ob-honorar')?.value    ?? _ob.honorar;
+    _ob.feeType             = document.getElementById('ob-feeType')?.value    ?? _ob.feeType;
+    _ob.leadSource          = document.getElementById('ob-leadSource')?.value ?? _ob.leadSource;
+    _ob.priority            = document.getElementById('ob-priority')?.value   ?? _ob.priority;
+    _ob.responsibleAdvisor  = document.getElementById('ob-advisor')?.value    ?? _ob.responsibleAdvisor;
   }
 }
 
@@ -10472,14 +10590,15 @@ async function submitOnboarding() {
   }
 
   // Opprett prosjektet
-  const projId = uid();
+  const projId  = uid();
+  const dealId  = generateDealId();
   DB.projects.push({
     id:               projId,
     customerId:       customer.id,
     projectType:      projTypeKey,
     name:             `${typeLabels[_ob.assignmentType]} – ${d.name}`,
     description:      _ob.background.trim(),
-    consultant:       '',
+    consultant:       _ob.responsibleAdvisor.trim() || 'Erlend Synnes-Sandberg',
     startDate:        _ob.startDate,
     endDate:          '',
     status:           'ikke-startet',
@@ -10488,11 +10607,18 @@ async function submitOnboarding() {
     honorarAvtalt:    null,
     honorarFakturert: null,
     timesats:         2600,
+    // Layer 1: dealId, lead source, priority, folder structure
+    dealId:           dealId,
+    leadSource:       _ob.leadSource.trim(),
+    priority:         _ob.priority || 'middels',
+    folders:          getStandardFolders(),
     createdAt:        now(),
     updatedAt:        now(),
   });
   generatePhaseTasks(projId, projTypeKey);
-  persistAll({ toast: `Klient og prosjekt opprettet for ${d.name}` });
+  generateOnboardingTasks(projId);
+  logActivity('notat', projId, `Onboarding fullført: klient «${d.name}», prosjekt ${dealId}, mappestruktur og sjekkliste opprettet.`);
+  persistAll({ toast: `Klient og prosjekt opprettet for ${d.name} (${dealId})` });
 
   // Generer oppdragsbrev
   _ob.letterLoading = true;
@@ -10669,10 +10795,32 @@ function renderOnboarding() {
         </div>
       </div>
 
+      <div class="form-row" style="gap:10px">
+        <div class="form-group" style="flex:1;margin:0">
+          <label>Leadkilde</label>
+          <select class="form-control" id="ob-leadSource">
+            ${[['','(Ikke valgt)'],['nettverk','Nettverk'],['kaldinntakt','Kald inntakt'],['anbefaling','Anbefaling'],['eksisterende','Eksisterende klient'],['inbound','Inbound / henvendelse'],['annet','Annet']]
+              .map(([k,v]) => `<option value="${k}"${ob.leadSource===k?' selected':''}>${v}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;margin:0">
+          <label>Prioritet</label>
+          <select class="form-control" id="ob-priority">
+            <option value="lav"${ob.priority==='lav'?' selected':''}>🟢 Lav</option>
+            <option value="middels"${ob.priority==='middels'?' selected':''}>🟡 Middels</option>
+            <option value="høy"${ob.priority==='høy'?' selected':''}>🔴 Høy</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;margin:0">
+          <label>Ansvarlig rådgiver</label>
+          <input class="form-control" id="ob-advisor" value="${escHtml(ob.responsibleAdvisor)}" placeholder="Rådgiver">
+        </div>
+      </div>
+
       <div class="form-actions" style="justify-content:flex-end;gap:10px">
         <button class="btn btn-secondary" onclick="_obReset();render()">Avbryt</button>
         <button class="btn btn-primary" onclick="_obSaveForm();submitOnboarding()" id="ob-submit-btn">
-          ✦&nbsp; Opprett klient &amp; generer oppdragsbrev
+          ✦&nbsp; Opprett klient, prosjekt &amp; oppdragsbrev
         </button>
       </div>
     </div>
