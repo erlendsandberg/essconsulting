@@ -10690,47 +10690,42 @@ async function submitOnboarding() {
 // Hent siste 3 årsregnskap fra Brønnøysund og lagre som dokument i 01 Grunnlag
 async function _fetchAarsregnskap(orgNr, companyName, projectId) {
   try {
-    const url = `https://data.brreg.no/regnskapsregisteret/regnskap?orgNummer=${orgNr}&size=3`;
-    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    // Korrekt URL: /{orgNr} — ikke query-parameter
+    const res = await fetch(
+      `https://data.brreg.no/regnskapsregisteret/regnskap/${orgNr}`,
+      { headers: { Accept: 'application/json' } }
+    );
 
-    if (res.status === 404) {
-      console.info(`Ingen regnskap funnet for org.nr ${orgNr}`);
-      return;
-    }
-    if (!res.ok) {
-      console.warn(`Brreg regnskap svarte ${res.status} for ${orgNr}`);
-      return;
-    }
+    if (res.status === 404) { console.info(`Ingen regnskap i Brønnøysund for ${orgNr}`); return; }
+    if (!res.ok)             { console.warn(`Brreg regnskap: HTTP ${res.status} for ${orgNr}`); return; }
 
+    // Responsen er et direkte array (ikke _embedded)
     const data  = await res.json();
-    const items = (data?._embedded?.regnskap || []).slice(0, 3);
-
-    if (!items.length) {
-      console.info(`Tomt regnskap-svar for ${orgNr}`);
-      return;
-    }
+    const items = (Array.isArray(data) ? data : []).slice(0, 3);
+    if (!items.length) { console.info(`Tom regnskap-liste for ${orgNr}`); return; }
 
     const fmtNr = v => v != null ? Number(v).toLocaleString('nb-NO') : '–';
 
     items.forEach(r => {
       const år = r.regnskapsperiode?.fraDato?.slice(0, 4) || '?';
-      const rs = r.resultatregnskapResultat || {};
-      const ba = r.balanseregnskapSumVerdier || {};
+      const rs = r.resultatregnskapResultat  || {};
+      const ei = r.eiendeler                 || {};   // sum eiendeler
+      const eg = r.egenkapitalGjeld          || {};   // egenkapital + gjeld
 
       const lines = [
         `ÅRSREGNSKAP ${år} — ${companyName} (org.nr ${orgNr})`,
         `Regnskapstype: ${r.regnskapstype || '–'} · Valuta: ${r.valuta || 'NOK'}`,
         '',
         '── RESULTAT ──────────────────────────────────────',
-        `Driftsinntekter:             ${fmtNr(rs.driftsresultat?.driftsinntekter?.sumDriftsinntekter)} kr`,
-        `Driftsresultat:              ${fmtNr(rs.driftsresultat?.driftsresultat)} kr`,
-        `Ordinært res. f. skatt:      ${fmtNr(rs.ordinaertResultatFoerSkattekostnad)} kr`,
-        `Årsresultat:                 ${fmtNr(rs.aarsresultat)} kr`,
+        `Driftsinntekter:         ${fmtNr(rs.driftsresultat?.driftsinntekter?.sumDriftsinntekter)} kr`,
+        `Driftsresultat:          ${fmtNr(rs.driftsresultat?.driftsresultat)} kr`,
+        `Ordinært res. f. skatt:  ${fmtNr(rs.ordinaertResultatFoerSkattekostnad)} kr`,
+        `Årsresultat:             ${fmtNr(rs.aarsresultat)} kr`,
         '',
         '── BALANSE ───────────────────────────────────────',
-        `Sum eiendeler:               ${fmtNr(ba.sumEiendeler)} kr`,
-        `Sum egenkapital:             ${fmtNr(ba.sumEgenkapitalGjeld?.sumEgenkapital)} kr`,
-        `Sum gjeld:                   ${fmtNr(ba.sumEgenkapitalGjeld?.sumGjeld)} kr`,
+        `Sum eiendeler:           ${fmtNr(ei.sumEiendeler)} kr`,
+        `Sum egenkapital:         ${fmtNr(eg.egenkapital?.sumEgenkapital)} kr`,
+        `Sum gjeld:               ${fmtNr(eg.gjeldOversikt?.sumGjeld)} kr`,
         '',
         'Kilde: Brønnøysundregistrene / Regnskapsregisteret',
       ].join('\n');
@@ -10748,7 +10743,7 @@ async function _fetchAarsregnskap(orgNr, companyName, projectId) {
     });
 
     persistAll();
-    render(); // Vis dokumentene umiddelbart
+    render();
     showToast(`📊 ${items.length} årsregnskap hentet fra Brønnøysund → 01 Grunnlag`, 'success');
   } catch (e) {
     console.warn('Årsregnskap-henting feilet:', e.message);
