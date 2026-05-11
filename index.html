@@ -7662,18 +7662,34 @@ function saveProject(id) {
 
   let newProjId;
   if (id) {
+    // ── Oppdater eksisterende prosjekt ──────────────────────────────────────
     const p = DB.projects.find(x => x.id === id);
     const oldType = p?.projectType;
     if (p) Object.assign(p, data);
-    // Regenerate phase tasks if type changed
     if (newType && newType !== oldType) {
       generatePhaseTasks(id, newType);
     }
     newProjId = id;
   } else {
-    newProjId = uid();
-    DB.projects.push({ id: newProjId, createdAt: now(), progress: 0, ...data });
+    // ── Nytt prosjekt — generer Deal ID, mapper og OneDrive-struktur ────────
+    newProjId       = uid();
+    const dealId    = generateDealId();
+    const newProj   = {
+      id:        newProjId,
+      createdAt: now(),
+      progress:  0,
+      dealId,
+      folders:   getStandardFolders(),
+      priority:  'middels',
+      ...data,
+    };
+    DB.projects.push(newProj);
     if (newType) generatePhaseTasks(newProjId, newType);
+
+    // Opprett OneDrive-mapper (ikke-blokkerende)
+    const cust      = DB.customers.find(c => c.id === custId);
+    const typeLabel = PROJECT_TYPES.find(t => t.key === newType)?.label || '';
+    if (cust) _createSharePointFolders(cust.name, dealId, typeLabel);
   }
 
   persistAll({toast: id ? 'Prosjekt oppdatert' : 'Prosjekt opprettet'});

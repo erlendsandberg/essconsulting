@@ -163,7 +163,6 @@ exports.handler = async (event) => {
   try {
     await createFolder(customerPath, projectFolder);
   } catch (e) {
-    // Hvis prosjektmappen allerede finnes (usannsynlig siden dealId er unik)
     if (!e.message.includes('409')) {
       return {
         statusCode: 502,
@@ -173,11 +172,28 @@ exports.handler = async (event) => {
     }
   }
 
+  // ── Steg 4: Undermapper — 01 Grunnlag / 02 Analyse & Leveranser / 03 Prosess & Signering
+  const subfolders = [
+    '01 Grunnlag',
+    '02 Analyse & Leveranser',
+    '03 Prosess & Signering',
+  ];
+  for (const sub of subfolders) {
+    try {
+      await createFolder(projectPath, sub);
+    } catch (e) {
+      // Ignorer 409 (finnes) og fortsett med neste
+      if (!e.message.includes('409')) {
+        console.error(`Undermappe «${sub}» feilet: ${e.message}`);
+      }
+    }
+  }
+
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      success:       true,
+      success:        true,
       customerFolder: customerPath,
       projectFolder:  projectPath,
     }),
