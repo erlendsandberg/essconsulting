@@ -10278,6 +10278,7 @@ document.addEventListener('keydown', (e) => {
 // Tilstand for onboarding-flyten (tilbakestilles ved navigate til ny klient)
 let _ob = {
   brregData:      null,   // data fra Brønnøysundregistrene
+  brregResults:   null,   // navnesøk-treff (liste)
   brregError:     null,
   assignmentType: null,   // valgt oppdragstype
   contact: '', email: '', phone: '',
@@ -10290,7 +10291,7 @@ let _ob = {
 
 function _obReset() {
   _ob = {
-    brregData: null, brregError: null, assignmentType: null,
+    brregData: null, brregResults: null, brregError: null, assignmentType: null,
     contact: '', email: '', phone: '', background: '',
     startDate: new Date().toISOString().slice(0, 10),
     honorar: '', feeType: 'fastpris',
@@ -10311,60 +10312,103 @@ function _obSaveForm() {
   }
 }
 
-// Slå opp org.nr i Brønnøysundregistrene
+// Hjelper: hent full enhet fra Brreg (org.nr) inkl. daglig leder
+async function _obFetchEnhet(orgNr) {
+  const res = await fetch(`https://data.brreg.no/enhetsregisteret/api/enheter/${orgNr}`);
+  if (res.status === 404) throw new Error(`Fant ingen enhet med org.nr ${orgNr}`);
+  if (!res.ok)            throw new Error(`Brreg svarte med HTTP ${res.status}`);
+  const d = await res.json();
+
+  const adr = d.forretningsadresse;
+  const adrStr = adr
+    ? [adr.adresse?.[0], [adr.postnummer, adr.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+    : '';
+
+  const result = {
+    orgNr:     orgNr,
+    name:      d.navn || '',
+    orgForm:   d.organisasjonsform?.beskrivelse || '',
+    founded:   d.stiftelsesdato ? d.stiftelsesdato.slice(0, 4) : '',
+    address:   adrStr,
+    nace:      d.naeringskode1?.beskrivelse || '',
+    employees: d.antallAnsatte ?? null,
+    ceo:       null,
+  };
+
+  // Hent daglig leder (beste forsøk)
+  try {
+    const rRes = await fetch(`https://data.brreg.no/enhetsregisteret/api/enheter/${orgNr}/roller`);
+    if (rRes.ok) {
+      const rData = await rRes.json();
+      const dagl = (rData.rollegrupper || [])
+        .flatMap(g => g.roller || [])
+        .find(r => r.type?.kode === 'DAGL');
+      if (dagl?.person?.navn) {
+        const n = dagl.person.navn;
+        result.ceo = [n.fornavn, n.mellomnavn, n.etternavn].filter(Boolean).join(' ');
+      }
+    }
+  } catch (_) {}
+
+  return result;
+}
+
+// Søk i Brønnøysundregistrene — støtter navn og org.nr
 async function lookupBrregOnboarding() {
-  const inp = document.getElementById('ob-orgnr');
+  const inp = document.getElementById('ob-query');
   if (!inp) return;
-  const raw = inp.value.replace(/\D/g, '');
-  if (raw.length !== 9) {
-    _ob.brregError = 'Org.nr må være nøyaktig 9 siffer';
-    render(); return;
-  }
-  _ob.brregError = null;
+  const q = inp.value.trim();
+  if (!q) { _ob.brregError = 'Skriv inn firmanavn eller org.nr'; render(); return; }
+
+  _ob.brregError   = null;
+  _ob.brregResults = null;
   const btn = document.getElementById('ob-lookup-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Henter…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Søker…'; }
+
+  const isOrgNr = /^\d[\d\s]{7,}$/.test(q);
 
   try {
-    const res = await fetch(`https://data.brreg.no/enhetsregisteret/api/enheter/${raw}`);
-    if (res.status === 404) throw new Error(`Fant ingen enhet med org.nr ${raw}`);
-    if (!res.ok)            throw new Error(`Brreg svarte med HTTP ${res.status}`);
-    const d = await res.json();
-
-    const adr = d.forretningsadresse;
-    const adrStr = adr
-      ? [[adr.adresse?.[0], [adr.postnummer, adr.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join('')
-      : '';
-
-    _ob.brregData = {
-      orgNr:     raw,
-      name:      d.navn || '',
-      orgForm:   d.organisasjonsform?.beskrivelse || '',
-      founded:   d.stiftelsesdato ? d.stiftelsesdato.slice(0, 4) : '',
-      address:   adrStr,
-      nace:      d.naeringskode1?.beskrivelse || '',
-      employees: d.antallAnsatte ?? null,
-      ceo:       null,
-    };
-
-    // Hent daglig leder fra roller-APIet (beste forsøk)
-    try {
-      const rRes = await fetch(`https://data.brreg.no/enhetsregisteret/api/enheter/${raw}/roller`);
-      if (rRes.ok) {
-        const rData = await rRes.json();
-        const dagl = (rData.rollegrupper || [])
-          .flatMap(g => g.roller || [])
-          .find(r => r.type?.kode === 'DAGL');
-        if (dagl?.person?.navn) {
-          const n = dagl.person.navn;
-          _ob.brregData.ceo = [n.fornavn, n.mellomnavn, n.etternavn].filter(Boolean).join(' ');
-        }
-      }
-    } catch (_) { /* roller-APIet er valgfritt */ }
-
+    if (isOrgNr) {
+      // Direkte oppslag på org.nr
+      const orgNr = q.replace(/\D/g, '').slice(-9);
+      _ob.brregData = await _obFetchEnhet(orgNr);
+    } else {
+      // Navnesøk — vis liste for valg
+      const url = `https://data.brreg.no/enhetsregisteret/api/enheter?navn=${encodeURIComponent(q)}&size=8`;
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (!res.ok) throw new Error(`Brreg svarte med HTTP ${res.status}`);
+      const data = await res.json();
+      const hits = data?._embedded?.enheter || [];
+      if (!hits.length) throw new Error(`Ingen treff på «${q}»`);
+      _ob.brregResults = hits.map(e => {
+        const adr = e.forretningsadresse;
+        return {
+          orgNr:   e.organisasjonsnummer,
+          name:    e.navn,
+          orgForm: e.organisasjonsform?.beskrivelse || '',
+          address: adr ? [adr.adresse?.[0], adr.poststed].filter(Boolean).join(', ') : '',
+        };
+      });
+    }
   } catch (e) {
     _ob.brregError = e.message;
-    _ob.brregData  = null;
   }
+  if (btn) { btn.disabled = false; btn.textContent = 'Søk'; }
+  render();
+}
+
+// Bruker valgte et selskap fra søkeresultatene
+async function obPickResult(orgNr) {
+  _ob.brregResults = null;
+  _ob.brregError   = null;
+  const btn = document.getElementById('ob-lookup-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Henter…'; }
+  try {
+    _ob.brregData = await _obFetchEnhet(orgNr);
+  } catch (e) {
+    _ob.brregError = e.message;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Søk'; }
   render();
 }
 
@@ -10523,19 +10567,26 @@ function renderOnboarding() {
     { key: 'annet',             label: 'Annet',                icon: '💼' },
   ];
 
-  // ── Steg 1: Org.nr-oppslag ─────────────────────────────────────────────────
+  // ── Steg 1: Søk ─────────────────────────────────────────────────────────
+  const resultsHtml = ob.brregResults ? ob.brregResults.map(r => `
+    <div class="brreg-result-item" onclick="obPickResult('${escHtml(r.orgNr)}')" style="cursor:pointer">
+      <div class="brreg-result-name">${escHtml(r.name)}</div>
+      <div class="brreg-result-meta">${escHtml(r.orgNr)}${r.orgForm ? ' · ' + escHtml(r.orgForm) : ''}${r.address ? ' · ' + escHtml(r.address) : ''}</div>
+    </div>`).join('') : '';
+
   const lookupSection = `
   <div class="card mb-16">
     <div class="card-header"><div class="card-title">🔍 Slå opp selskap i Brønnøysund</div></div>
     <div class="card-body" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
-      <div class="form-group" style="flex:1;min-width:180px;margin:0">
-        <label>Organisasjonsnummer</label>
-        <input class="form-control" id="ob-orgnr" placeholder="915 137 458" inputmode="numeric" maxlength="12"
+      <div class="form-group" style="flex:1;min-width:200px;margin:0">
+        <label>Firmanavn eller org.nr</label>
+        <input class="form-control" id="ob-query" placeholder="Optimera AS  eller  915 137 458"
           onkeydown="if(event.key==='Enter'){event.preventDefault();lookupBrregOnboarding()}">
       </div>
-      <button class="btn btn-primary" id="ob-lookup-btn" onclick="lookupBrregOnboarding()">Hent firmainfo</button>
+      <button class="btn btn-primary" id="ob-lookup-btn" onclick="lookupBrregOnboarding()">Søk</button>
       ${d ? `<button class="btn btn-ghost" onclick="_obReset();render()">✕ Nullstill</button>` : ''}
     </div>
+    ${ob.brregResults ? `<div class="brreg-results" style="display:block;margin:0 24px 16px">${resultsHtml}</div>` : ''}
     ${ob.brregError ? `<div style="color:var(--red);font-size:13px;padding:0 24px 16px">${escHtml(ob.brregError)}</div>` : ''}
   </div>`;
 
