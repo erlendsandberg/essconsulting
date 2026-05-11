@@ -10707,20 +10707,21 @@ async function submitOnboarding() {
 
 // Hent siste 3 årsregnskap fra Brønnøysund og lagre som dokument i 01 Grunnlag
 async function _fetchAarsregnskap(orgNr, companyName, projectId) {
-  showToast(`Henter årsregnskap for ${orgNr}…`, 'info');
   try {
-    // Korrekt URL: /{orgNr} — ikke query-parameter
+    // Proxy via Netlify-funksjon for å unngå CORS-blokkering i nettleser
     const res = await fetch(
-      `https://data.brreg.no/regnskapsregisteret/regnskap/${orgNr}`,
+      `/.netlify/functions/brreg?orgNr=${encodeURIComponent(orgNr)}`,
       { headers: { Accept: 'application/json' } }
     );
 
-    if (res.status === 404) { showToast(`Ingen regnskap i Brønnøysund for org.nr ${orgNr}`, 'info'); return; }
-    if (!res.ok)             { showToast(`Brreg regnskap svarte HTTP ${res.status} for ${orgNr}`, 'error'); return; }
+    const payload = await res.json();
 
-    const raw  = await res.json();
-    const data = Array.isArray(raw) ? raw : (raw._embedded?.regnskap || []);
-    const items = data.slice(0, 3);
+    if (!res.ok) {
+      showToast(`Årsregnskap: ${payload.error || 'ukjent feil'}`, res.status === 404 ? 'info' : 'error');
+      return;
+    }
+
+    const items = Array.isArray(payload) ? payload : [];
     if (!items.length) { showToast(`Brønnøysund: ingen regnskapsdata funnet for ${orgNr}`, 'info'); return; }
 
     const fmtNr = v => v != null ? Number(v).toLocaleString('nb-NO') : '–';
