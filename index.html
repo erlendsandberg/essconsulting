@@ -3580,15 +3580,16 @@ function renderProjectDetail(id) {
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         ${(() => {
           const projDocs = DB.documents.filter(d => d.projectId === p.id);
-          const folderOpts = (p.folders||[]).map(f =>
-            `<option value="${escHtml(f)}">${escHtml(f)}</option>`).join('');
           return `
             ${projDocs.length > 0 ? `<span style="font-size:11px;color:var(--text-muted)">${projDocs.length} dokument${projDocs.length>1?'er':''}</span>` : ''}
             ${p.folders?.length ? `
-              <select id="doc-folder-${p.id}" class="form-control" style="font-size:11px;padding:3px 6px;height:auto;max-width:160px"
-                title="Velg mappe for neste opplasting">
-                <option value="">📁 Ingen mappe</option>
-                ${folderOpts}
+              <select id="doc-folder-${p.id}" class="form-control" style="font-size:11px;padding:3px 6px;height:auto;max-width:185px"
+                title="Filtrer dokumenter · valgt mappe brukes også ved opplasting"
+                onchange="setDocFolderFilter('${p.id}', this.value)">
+                <option value="">📁 Alle mapper</option>
+                ${(p.folders||[]).map(f =>
+                  '<option value="' + escHtml(f) + '"' + ((_docFolderFilter[p.id]||'') === f ? ' selected' : '') + '>' + escHtml(f) + '</option>'
+                ).join('')}
               </select>` : ''}
             <label class="btn btn-ghost btn-sm" style="font-size:12px;cursor:pointer;margin:0">
               ⬆️ Last opp
@@ -3605,12 +3606,18 @@ function renderProjectDetail(id) {
         ondrop="docDrop(event,'${p.id}')"
         style="border:2px dashed transparent;border-radius:8px;transition:border-color .15s,background .15s;min-height:8px">
       ${(() => {
-        const projDocs = DB.documents.filter(d => d.projectId === p.id)
-          .sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+        const activeFolder = _docFolderFilter[p.id] || '';
+        const allDocs  = DB.documents.filter(d => d.projectId === p.id);
+        const projDocs = (activeFolder
+          ? allDocs.filter(d => d.folder === activeFolder)
+          : allDocs
+        ).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
         if (!projDocs.length) return `
           <div style="text-align:center;padding:28px 20px;color:var(--text-muted);font-size:13px">
-            Dra filer hit, eller bruk <strong>⬆️ Last opp</strong>-knappen.<br>
-            <span style="font-size:12px">PDF, TXT, MD, DOCX og CSV støttes.</span>
+            ${activeFolder
+              ? `Ingen dokumenter i <strong>${escHtml(activeFolder)}</strong> ennå.<br><span style="font-size:12px">Last opp eller velg en annen mappe.</span>`
+              : `Dra filer hit, eller bruk <strong>⬆️ Last opp</strong>-knappen.<br><span style="font-size:12px">PDF, TXT, MD, DOCX og CSV støttes.</span>`
+            }
           </div>`;
         return projDocs.map(doc => `
           <div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)" id="doc-row-${doc.id}">
@@ -8457,6 +8464,11 @@ function toggleTask(taskId) {
 /* ============================================================
    NOTES
    ============================================================ */
+function setDocFolderFilter(projId, val) {
+  _docFolderFilter[projId] = val;
+  render();
+}
+
 function addNote(projectId) {
   const input = document.getElementById('newNoteInput');
   const text = input?.value.trim();
@@ -9309,7 +9321,8 @@ function loadDemoData() {
 /* ============================================================
    TIMEOVERSIKT — modal + PDF-generator
    ============================================================ */
-let _noteDraft = '';   // bevarer notat-utkast på tvers av render()
+let _noteDraft = '';          // bevarer notat-utkast på tvers av render()
+let _docFolderFilter = {};    // { [projId]: valgt mappe ('' = alle) }
 let _timeoversiktLines = [];
 let _timeoversiktProjId = null;
 let _timeoversiktFakturert = 0;
@@ -10702,13 +10715,13 @@ async function _fetchAarsregnskap(orgNr, companyName, projectId) {
       { headers: { Accept: 'application/json' } }
     );
 
-    if (res.status === 404) { console.info(`Ingen regnskap i Brønnøysund for ${orgNr}`); return; }
-    if (!res.ok)             { console.warn(`Brreg regnskap: HTTP ${res.status} for ${orgNr}`); return; }
+    if (res.status === 404) { showToast(`Ingen regnskap i Brønnøysund for org.nr ${orgNr}`, 'info'); return; }
+    if (!res.ok)             { showToast(`Brreg regnskap svarte HTTP ${res.status} for ${orgNr}`, 'error'); return; }
 
-    // Responsen er et direkte array (ikke _embedded)
-    const data  = await res.json();
-    const items = (Array.isArray(data) ? data : []).slice(0, 3);
-    if (!items.length) { console.info(`Tom regnskap-liste for ${orgNr}`); return; }
+    const raw  = await res.json();
+    const data = Array.isArray(raw) ? raw : (raw._embedded?.regnskap || []);
+    const items = data.slice(0, 3);
+    if (!items.length) { showToast(`Brønnøysund: ingen regnskapsdata funnet for ${orgNr}`, 'info'); return; }
 
     const fmtNr = v => v != null ? Number(v).toLocaleString('nb-NO') : '–';
 
@@ -10752,7 +10765,7 @@ async function _fetchAarsregnskap(orgNr, companyName, projectId) {
     render();
     showToast(`📊 ${items.length} årsregnskap hentet fra Brønnøysund → 01 Grunnlag`, 'success');
   } catch (e) {
-    console.warn('Årsregnskap-henting feilet:', e.message);
+    showToast(`Årsregnskap-feil: ${e.message}`, 'error');
   }
 }
 
