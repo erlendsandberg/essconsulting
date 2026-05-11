@@ -8074,16 +8074,28 @@ function generateDealId() {
 // Standard mappestruktur for alle M&A/rådgivningsoppdrag
 function getStandardFolders() {
   return [
-    '01 Admin',
-    '02 Økonomi',
-    '03 Juridisk',
-    '04 Kommersielt',
-    '05 Ledelse',
-    '06 Verdivurdering',
-    '07 Markedsmateriell',
-    '08 Due diligence',
-    '09 Closing',
+    '01 Grunnlag',
+    '02 Analyse & Leveranser',
+    '03 Prosess & Signering',
   ];
+}
+
+// Migrer prosjekter med gammel 9-mappestruktur til ny 3-mappestruktur
+function _migrateProjectFolders() {
+  const OLD_FIRST = '01 Admin'; // kjennetegn på gammel struktur
+  const newFolders = getStandardFolders();
+  let updated = 0;
+  DB.projects.forEach(p => {
+    if (Array.isArray(p.folders) && p.folders[0] === OLD_FIRST) {
+      p.folders    = newFolders;
+      p.updatedAt  = now();
+      updated++;
+    }
+  });
+  if (updated > 0) {
+    persistAll();
+    console.log(`Migrerte ${updated} prosjekt(er) til ny mappestruktur (3 mapper)`);
+  }
 }
 
 // Opprett standard onboarding-sjekkliste for nytt prosjekt
@@ -10379,6 +10391,9 @@ async function initApp() {
     loader.style.opacity = '0';
     setTimeout(() => loader.remove(), 400);
   }
+
+  // Migrer eventuelle prosjekter med gammel 9-mappestruktur → ny 3-mappestruktur
+  _migrateProjectFolders();
 
   // ALDRI kall loadDemoData() automatisk — det sletter all Supabase-data.
   // Tom database er OK (ny bruker). Demo-data lastes kun manuelt fra Innstillinger.
