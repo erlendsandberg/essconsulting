@@ -1,8 +1,6 @@
 [build]
   functions = "netlify/functions"
 
-[functions."ai"]
-  timeout = 26
 
 [[headers]]
   for = "/netlify/functions/*"
