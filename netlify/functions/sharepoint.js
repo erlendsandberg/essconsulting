@@ -162,9 +162,11 @@ exports.handler = async (event) => {
   // Format: "DEAL-2026-0001 Salgsprosess"
   const projectFolder = sanitize(`${dealId}${typeLabel ? ' ' + typeLabel : ''}`);
   const projectPath   = `${customerPath}/${projectFolder}`;
+  let projectFolderUrl = null;
 
   try {
-    await createFolder(customerPath, projectFolder);
+    const created = await createFolder(customerPath, projectFolder);
+    if (created?.webUrl) projectFolderUrl = created.webUrl;
   } catch (e) {
     if (!e.message.includes('409')) {
       return {
@@ -196,9 +198,10 @@ exports.handler = async (event) => {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      success:        true,
-      customerFolder: customerPath,
-      projectFolder:  projectPath,
+      success:           true,
+      customerFolder:    customerPath,
+      projectFolder:     projectPath,
+      projectFolderUrl:  projectFolderUrl, // Direkte URL til mappen i OneDrive
     }),
   };
 };
