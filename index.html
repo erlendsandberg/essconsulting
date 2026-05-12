@@ -1821,6 +1821,8 @@ tr:hover td { background: #FAFAFA; }
   text-decoration: none; opacity: 0.9;
 }
 #demo-banner a:hover { opacity: 1; text-decoration: underline; }
+.gsearch-item.active { background: var(--blue-pale); }
+.gsearch-item:hover  { background: var(--bg); }
 </style>
 </head>
 <body>
@@ -1865,6 +1867,21 @@ tr:hover td { background: #FAFAFA; }
 
 <!-- OVERLAY (mobile) -->
 <div id="overlay" onclick="closeSidebar()"></div>
+
+<!-- GLOBAL SEARCH OVERLAY -->
+<div id="gsearch-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.55);backdrop-filter:blur(3px)" onclick="if(event.target===this)closeGlobalSearch()">
+  <div style="background:var(--white);border-radius:14px;max-width:620px;width:calc(100% - 32px);margin:80px auto 0;box-shadow:0 24px 64px rgba(0,0,0,0.25);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)">
+      <span style="font-size:18px;color:var(--text-muted)">🔍</span>
+      <input id="gsearch-input" type="text" placeholder="Søk i prosjekter, kunder, notater…"
+        style="flex:1;border:none;outline:none;font-size:15px;background:transparent;color:var(--text)"
+        oninput="_doGlobalSearch(this.value)"
+        onkeydown="handleGsearchKey(event)">
+      <span style="font-size:11px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 6px">ESC</span>
+    </div>
+    <div id="gsearch-results" style="max-height:420px;overflow-y:auto;padding:8px 0"></div>
+  </div>
+</div>
 
 <!-- TOAST -->
 <div id="toast-container"></div>
@@ -1958,6 +1975,7 @@ tr:hover td { background: #FAFAFA; }
     <header id="topbar">
       <button id="hamburger" onclick="toggleSidebar()">☰</button>
       <div class="page-title" id="pageTitle">Dashboard</div>
+      <button class="btn btn-ghost btn-sm" onclick="openGlobalSearch()" title="Søk (Cmd+K)" style="font-size:13px">🔍 Søk</button>
       <button class="btn btn-ghost btn-sm" onclick="openCustomerModal(null)">+ Ny kunde</button>
       <button id="topbar-ai-btn" class="btn btn-ghost btn-sm" onclick="openQuickEstimateModal()" title="Rask prisestimering">✦ Prisestimat</button>
       <button class="btn btn-primary btn-sm" onclick="openProjectModal(null)">+ Nytt prosjekt</button>
@@ -2495,6 +2513,19 @@ function renderDashboard() {
 
   const totalAlerts = overdue.length + waitCust.length + overdueT.length + soonT.length;
 
+  /* ---- Inaktive prosjekter (>14 dager uten aktivitet) ---- */
+  const staleProjects = (() => {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 14);
+    const cutoffIso = cutoff.toISOString();
+    return active.filter(p => {
+      if (p.status === 'avsluttet' || p.status === 'ikke-startet') return false;
+      const lastActivity = DB.activityLog
+        .filter(e => e.projectId === p.id)
+        .sort((a, b) => (b.ts||'').localeCompare(a.ts||''))[0];
+      return !lastActivity || lastActivity.ts < cutoffIso;
+    });
+  })();
+
   /* ---- STAT BAR ---- */
   const statBar = `
   <div class="stat-bar">
@@ -2686,7 +2717,10 @@ function renderDashboard() {
   <div class="alert-panel">
     <div class="alert-panel-header">
       <div class="alert-panel-title">Krever handling</div>
-      <span class="alert-panel-count ${totalAlerts > 0 ? 'has' : 'none'}">${totalAlerts}</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="btn btn-ghost btn-sm" onclick="openQuickLogModal()" style="font-size:11px;padding:3px 8px">+ Logg</button>
+        <span class="alert-panel-count ${totalAlerts > 0 ? 'has' : 'none'}">${totalAlerts}</span>
+      </div>
     </div>
     ${alertRows}
     ${extra > 0 || totalAlerts > 0 ? `
@@ -2700,9 +2734,91 @@ function renderDashboard() {
   // Trigger Vera async after render
   setTimeout(() => runVera(), 80);
 
+  /* ---- Stillestående prosjekter-kort ---- */
+  const staleCard = staleProjects.length ? (() => {
+    const items = staleProjects.slice(0, 4).map(p => {
+      const c = getCustomer(p.customerId);
+      const lastAct = DB.activityLog
+        .filter(e => e.projectId === p.id)
+        .sort((a, b) => (b.ts||'').localeCompare(a.ts||''))[0];
+      const daysAgo = lastAct
+        ? Math.floor((Date.now() - new Date(lastAct.ts).getTime()) / 86400000)
+        : null;
+      return `
+        <div class="proj-row" onclick="navigate('project-detail',{projectId:'${p.id}'})" style="cursor:pointer">
+          <div class="proj-row-accent" style="background:#6b7280"></div>
+          <div class="proj-row-body">
+            <div class="proj-row-name">${escHtml(p.name)}</div>
+            <div class="proj-row-meta">
+              ${c ? `<span>👤 ${escHtml(c.name)}</span>` : ''}
+              ${badge(p.status)}
+              <span style="color:#6b7280;font-weight:600">${daysAgo !== null ? `${daysAgo} dager uten aktivitet` : 'Ingen aktivitet registrert'}</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+    return `
+    <div class="card mb-24" style="border-left:4px solid #6b7280">
+      <div class="card-header">
+        <div class="card-title" style="color:#6b7280">💤 Stillestående prosjekter (${staleProjects.length})</div>
+        <span style="font-size:11px;color:var(--text-muted)">Ingen aktivitet siste 14 dager</span>
+      </div>
+      <div class="proj-list">${items}</div>
+    </div>`;
+  })() : '';
+
+  /* ---- Kommende frister — neste 7 dager ---- */
+  const upcomingCard = (() => {
+    const soon7 = active.filter(p => p.endDate && isDueSoon(p.endDate, 7) && !isOverdue(p.endDate));
+    const soonTasks7 = DB.tasks.filter(t => t.status !== 'fullfort' && t.dueDate && isDueSoon(t.dueDate, 7) && !isOverdue(t.dueDate));
+    if (!soon7.length && !soonTasks7.length) return '';
+    const projItems = soon7.map(p => {
+      const c = getCustomer(p.customerId);
+      const daysLeft = Math.ceil((new Date(p.endDate) - new Date(today())) / 86400000);
+      return `
+        <div class="proj-row" onclick="navigate('project-detail',{projectId:'${p.id}'})" style="cursor:pointer">
+          <div class="proj-row-accent blue"></div>
+          <div class="proj-row-body">
+            <div class="proj-row-name">📁 ${escHtml(p.name)}</div>
+            <div class="proj-row-meta">
+              ${c ? `<span>${escHtml(c.name)}</span>` : ''}
+              <span style="color:var(--blue);font-weight:600">${daysLeft === 0 ? 'I dag' : `Om ${daysLeft} dag${daysLeft===1?'':'er'}`}</span>
+              <span style="color:var(--text-muted)">${fmtDate(p.endDate)}</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+    const taskItems = soonTasks7.slice(0, 4).map(t => {
+      const p = getProject(t.projectId);
+      const daysLeft = Math.ceil((new Date(t.dueDate) - new Date(today())) / 86400000);
+      return `
+        <div class="proj-row" onclick="${p?`navigate('project-detail',{projectId:'${p.id}'})`:''}">
+          <div class="proj-row-accent orange"></div>
+          <div class="proj-row-body">
+            <div class="proj-row-name">📋 ${escHtml(t.name)}</div>
+            <div class="proj-row-meta">
+              ${p ? `<span>${escHtml(p.name)}</span>` : ''}
+              <span style="color:#d97706;font-weight:600">${daysLeft === 0 ? 'I dag' : `Om ${daysLeft} dag${daysLeft===1?'':'er'}`}</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+    return `
+    <div class="card mb-24" style="border-left:4px solid var(--blue)">
+      <div class="card-header">
+        <div class="card-title" style="color:var(--blue)">📅 Frister neste 7 dager (${soon7.length + soonTasks7.length})</div>
+        <button class="btn btn-ghost btn-sm" onclick="navigate('followup')">Se alle →</button>
+      </div>
+      <div class="proj-list">${projItems}${taskItems}</div>
+    </div>`;
+  })();
+
   return `${renderVeraShell()}${statBar}
   ${alertCard}
   ${riskCard}
+  ${upcomingCard}
+  ${staleCard}
+  ${renderTimelineCard()}
   <div class="dash-body">
     <div>${leftCol}</div>
     <div>${rightCol}</div>
@@ -3218,6 +3334,16 @@ function renderFollowup() {
 
 function setFollowupFilter(v) { window._followupFilter = v; render(); }
 
+function togglePhaseCollapse(projectId, phaseNr) {
+  const key = `${projectId}_${phaseNr}`;
+  _collapsedPhases[key] = !_collapsedPhases[key];
+  // Toggle synlighet uten full re-render
+  const tasksEl = document.getElementById(`phase-tasks-${projectId}-${phaseNr}`);
+  const btn      = document.getElementById(`phase-collapse-btn-${projectId}-${phaseNr}`);
+  if (tasksEl) tasksEl.style.display = _collapsedPhases[key] ? 'none' : '';
+  if (btn) btn.textContent = _collapsedPhases[key] ? '▸' : '▾';
+}
+
 /* ============================================================
    PROJECT DETAIL
    ============================================================ */
@@ -3354,11 +3480,14 @@ function renderProjectDetail(id) {
       const tasksDone  = phaseTasks.filter(t => t.status === 'fullfort').length;
       const tasksTotal = phaseTasks.length;
 
+      const phaseCollapseKey = `${id}_${phase.nr}`;
+      const phaseCollapsed = !!_collapsedPhases[phaseCollapseKey];
       tasksBodyHtml += `
       <div class="phase-group ${isMilestoneDone ? 'phase-done' : isCurrent ? 'phase-current' : ''}"
            id="phase-${phase.nr}">
-        <div class="phase-group-header">
+        <div class="phase-group-header" style="cursor:pointer" onclick="togglePhaseCollapse('${id}',${phase.nr})">
           <div class="phase-group-title">
+            <span id="phase-collapse-btn-${id}-${phase.nr}" style="font-size:11px;color:var(--text-muted);margin-right:4px;user-select:none">${phaseCollapsed ? '▸' : '▾'}</span>
             <span class="phase-group-nr">${isMilestoneDone ? '✓' : phase.nr}</span>
             <span>${escHtml(phase.name)}</span>
           </div>
@@ -3367,7 +3496,7 @@ function renderProjectDetail(id) {
             ${!isMilestoneDone ? `<div class="phase-mini-bar"><div style="width:${tasksTotal ? Math.round((tasksDone/tasksTotal)*100) : 0}%;background:var(--blue);height:100%;border-radius:3px"></div></div>` : ''}
           </div>
         </div>
-        <div class="phase-tasks">
+        <div class="phase-tasks" id="phase-tasks-${id}-${phase.nr}" style="${phaseCollapsed ? 'display:none' : ''}">
           ${phaseTasks.filter(t => t.type !== 'milepæl').map(renderTaskRow).join('')}
           ${milestone ? renderTaskRow(milestone) : ''}
         </div>
@@ -3375,15 +3504,23 @@ function renderProjectDetail(id) {
     });
     // Manual tasks added separately
     if (manualTasks.length) {
+      const extraCollapseKey = `${id}_extra`;
+      const extraCollapsed = !!_collapsedPhases[extraCollapseKey];
       tasksBodyHtml += `
       <div class="phase-group">
-        <div class="phase-group-header">
+        <div class="phase-group-header" style="cursor:pointer" onclick="togglePhaseCollapse('${id}','extra')">
           <div class="phase-group-title">
+            <span id="phase-collapse-btn-${id}-extra" style="font-size:11px;color:var(--text-muted);margin-right:4px;user-select:none">${extraCollapsed ? '▸' : '▾'}</span>
             <span class="phase-group-nr">+</span>
             <span>Ekstra oppgaver</span>
           </div>
+          <div class="phase-group-meta">
+            <span class="phase-task-count">${manualTasks.length}</span>
+          </div>
         </div>
-        <div class="phase-tasks">${manualTasks.map(renderTaskRow).join('')}</div>
+        <div class="phase-tasks" id="phase-tasks-${id}-extra" style="${extraCollapsed ? 'display:none' : ''}">
+          ${manualTasks.map(renderTaskRow).join('')}
+        </div>
       </div>`;
     }
   } else {
@@ -5910,16 +6047,35 @@ async function _sendToVera(fullPrompt, displayText) {
     .map(([dag, lines]) => `${dag}:\n${lines.join('\n')}`)
     .join('\n\n') || '  (ingen aktivitet siste 30 dager)';
 
+  // Bygg dokument-kontekst for Vera (inntil 15k tegn totalt)
+  const DOC_BUDGET = 15000;
+  let docCtxParts = [];
+  let docBudgetLeft = DOC_BUDGET;
+  active.forEach(p => {
+    const projDocs = DB.documents.filter(d => d.projectId === p.id && d.text);
+    if (!projDocs.length) return;
+    const c2 = DB.customers.find(x => x.id === p.customerId);
+    projDocs.forEach(doc => {
+      if (docBudgetLeft <= 0) return;
+      const snippet = (doc.text || '').slice(0, Math.min(3000, docBudgetLeft));
+      docBudgetLeft -= snippet.length;
+      docCtxParts.push(`[${p.name}${c2?' / '+c2.name:''}] ${doc.name}:\n${snippet}`);
+    });
+  });
+  const docCtxText = docCtxParts.length
+    ? '\n\nOPPLASTEDE DOKUMENTER (tekstutdrag):\n' + docCtxParts.join('\n\n---\n\n')
+    : '';
+
   const systemPrompt = `Du er Vera, en profesjonell, varm og direkte AI-assistent for Erlend Synnes-Sandberg i ESS Consulting AS (M&A og finansiell rådgivning, Hamar).
 Dagens dato: ${today}
 Du kjenner alle prosjektene hans:
 ${JSON.stringify(projCtx, null, 2)}
 
 AKTIVITETSLOGG SISTE 30 DAGER (gruppert per dato):
-${logg30Tekst}
+${logg30Tekst}${docCtxText}
 
 Svar konsist og handlingsorientert på norsk. Bruk linjeskift for lesbarhet. Maksimalt 250 ord med mindre det er nødvendig med mer.
-Du har ALLTID tilgang til prosjektdata og aktivitetsloggen over — bruk dem aktivt i svarene dine.
+Du har ALLTID tilgang til prosjektdata, aktivitetsloggen og dokumentene over — bruk dem aktivt i svarene dine.
 Hvis du får spørsmål om en spesifikk dato (f.eks. "hva gjorde jeg 3. mars?"), finn den datoen i loggen og svar presist.
 Bruk gjerne **fet tekst** for å fremheve viktige punkter, og bindestrek for lister. Unngå ### overskrifter.
 Hvis du lager tekst (e-post, notat, fakturatekst) — lever den ferdig formatert, klar til bruk.`;
@@ -7361,6 +7517,144 @@ function brregFill(enhet) {
   if (queryEl) queryEl.value = '';
 
   showToast(`Hentet info for ${enhet.navn}`, 'success');
+}
+
+/* ============================================================
+   TIDSLINJE — prosjektfristeoversikt
+   ============================================================ */
+function renderTimelineCard() {
+  const active = DB.projects.filter(p => p.status !== 'avsluttet' && p.endDate);
+  if (active.length < 2) return ''; // Ikke vis med under 2 prosjekter med frist
+
+  const todayD = new Date(today());
+  // Vis neste 10 uker
+  const WEEKS = 10;
+  const endRange = new Date(todayD); endRange.setDate(endRange.getDate() + WEEKS * 7);
+  const startRange = new Date(todayD); startRange.setDate(startRange.getDate() - 7); // 1 uke bak
+
+  const totalDays = Math.ceil((endRange - startRange) / 86400000);
+
+  const sortedProjects = active
+    .filter(p => new Date(p.endDate) >= startRange)
+    .sort((a, b) => a.endDate.localeCompare(b.endDate))
+    .slice(0, 8);
+
+  if (!sortedProjects.length) return '';
+
+  // Week headers
+  const weekHeaders = [];
+  for (let w = 0; w <= WEEKS; w++) {
+    const d = new Date(startRange); d.setDate(d.getDate() + w * 7);
+    const pct = (w * 7 / totalDays * 100).toFixed(1);
+    const isNow = w === 1;
+    weekHeaders.push(`<div style="position:absolute;left:${pct}%;top:0;font-size:10px;color:${isNow?'var(--blue)':'var(--text-muted)'};white-space:nowrap;transform:translateX(-50%)">${d.toLocaleDateString('no-NO',{day:'2-digit',month:'short'})}</div>`);
+  }
+
+  // Today marker
+  const todayPct = (7 / totalDays * 100).toFixed(1);
+
+  const rows = sortedProjects.map(p => {
+    const c = DB.customers.find(x => x.id === p.customerId);
+    const endD = new Date(p.endDate);
+    const pct  = Math.max(0, Math.min(100, ((endD - startRange) / 86400000 / totalDays * 100)));
+    const od   = isOverdue(p.endDate);
+    const daysLeft = Math.ceil((endD - todayD) / 86400000);
+    const color = od ? 'var(--red)' : daysLeft <= 7 ? '#d97706' : 'var(--blue)';
+    const label = od ? `${Math.abs(daysLeft)}d over` : daysLeft === 0 ? 'I dag' : `${daysLeft}d`;
+    return `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="width:130px;flex-shrink:0;font-size:12px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+           title="${escHtml(p.name)}">${escHtml(p.name.length > 18 ? p.name.slice(0,17)+'…' : p.name)}</div>
+      <div style="flex:1;position:relative;height:18px">
+        <div style="position:absolute;inset:7px 0;background:var(--border);border-radius:2px"></div>
+        <div style="position:absolute;top:0;left:calc(${todayPct}% - 0.5px);width:1px;height:100%;background:var(--blue);opacity:0.4"></div>
+        <div style="position:absolute;left:calc(${pct.toFixed(1)}% - 6px);top:3px;width:12px;height:12px;border-radius:50%;background:${color};cursor:pointer;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.2)"
+             onclick="navigate('project-detail',{projectId:'${p.id}'})"
+             title="${escHtml(p.name)} — ${fmtDate(p.endDate)}"></div>
+      </div>
+      <div style="width:55px;flex-shrink:0;font-size:11px;font-weight:600;color:${color};text-align:right">${label}</div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="card mb-16">
+    <div class="card-header">
+      <div class="card-title">📆 Prosjektfrister — oversikt</div>
+      <span style="font-size:11px;color:var(--text-muted)">Neste ${WEEKS} uker</span>
+    </div>
+    <div class="card-body">
+      <div style="position:relative;height:22px;margin-bottom:16px;margin-left:140px">
+        ${weekHeaders.join('')}
+      </div>
+      ${rows}
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   HURTIGLOGG — logg aktivitet direkte fra dashboard
+   ============================================================ */
+function openQuickLogModal() {
+  const activeProj = DB.projects.filter(p => p.status !== 'avsluttet');
+  if (!activeProj.length) { showToast('Ingen aktive prosjekter å logge på', 'error'); return; }
+
+  const projOptions = activeProj
+    .map(p => {
+      const c = DB.customers.find(x => x.id === p.customerId);
+      return `<option value="${p.id}">${escHtml(p.name)}${c?' – '+escHtml(c.name):''}`;
+    }).join('');
+
+  document.getElementById('modalTitle').textContent = '📝 Logg aktivitet';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="form-group">
+      <label>Prosjekt</label>
+      <select class="form-control" id="ql-project">
+        <option value="">— Velg prosjekt —</option>
+        ${projOptions}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Type</label>
+      <select class="form-control" id="ql-type">
+        <option value="notat">📝 Statusoppdatering</option>
+        <option value="notat">📞 Telefonsamtale</option>
+        <option value="notat">🤝 Møte</option>
+        <option value="notat">✉️ E-post sendt</option>
+        <option value="notat">📄 Dokument levert</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Hva skjedde?</label>
+      <textarea class="form-control" id="ql-text" rows="3"
+        placeholder="Kort beskrivelse av aktiviteten…"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Avbryt</button>
+      <button class="btn btn-primary" onclick="saveQuickLog()">Logg aktivitet</button>
+    </div>`;
+  openModal();
+  setTimeout(() => document.getElementById('ql-project')?.focus(), 100);
+}
+
+function saveQuickLog() {
+  const projId = document.getElementById('ql-project')?.value;
+  const typeEl = document.getElementById('ql-type');
+  const text   = document.getElementById('ql-text')?.value.trim();
+
+  if (!projId) { showToast('Velg et prosjekt', 'error'); return; }
+  if (!text)   { showToast('Skriv hva som skjedde', 'error'); return; }
+
+  const typeLabel = typeEl?.options[typeEl.selectedIndex]?.text || '';
+
+  // Logg til aktivitetslogg
+  logActivity('notat', projId, typeLabel ? `${typeLabel}: ${text}` : text);
+
+  // Lagre også som notat
+  const note = { id: uid(), projectId: projId, text: `${typeLabel ? typeLabel+': ' : ''}${text}`, createdAt: now() };
+  DB.notes.push(note);
+  persistAll({ toast: 'Aktivitet logget ✓' });
+  closeModal();
+  render();
 }
 
 function openCustomerModal(id) {
@@ -9336,6 +9630,8 @@ function loadDemoData() {
    TIMEOVERSIKT — modal + PDF-generator
    ============================================================ */
 let _noteDraft = '';          // bevarer notat-utkast på tvers av render()
+// Kollapsede fasegupper per prosjekt: key = "${projectId}_${phaseNr}"
+let _collapsedPhases = {};
 let _timeoversiktLines = [];
 let _timeoversiktProjId = null;
 let _timeoversiktFakturert = 0;
@@ -10419,6 +10715,151 @@ ${timelineHtml}
   win.document.write(html);
   win.document.close();
 }
+
+/* ============================================================
+   GLOBAL SØKEBOKS (Cmd/Ctrl+K)
+   ============================================================ */
+function openGlobalSearch() {
+  const overlay = document.getElementById('gsearch-overlay');
+  const input = document.getElementById('gsearch-input');
+  if (!overlay) return;
+  overlay.style.display = 'block';
+  if (input) { input.value = ''; input.focus(); }
+  document.getElementById('gsearch-results').innerHTML = `
+    <div style="padding:24px 18px;color:var(--text-muted);font-size:13px;text-align:center">
+      Søk i prosjekter, kunder, notater og dokumenter
+    </div>`;
+}
+
+function closeGlobalSearch() {
+  const overlay = document.getElementById('gsearch-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function handleGsearchKey(e) {
+  if (e.key === 'Escape') { closeGlobalSearch(); return; }
+  if (e.key === 'Enter') {
+    const first = document.querySelector('.gsearch-item');
+    if (first) first.click();
+    return;
+  }
+  // Arrow key navigation
+  const items = [...document.querySelectorAll('.gsearch-item')];
+  const active = document.querySelector('.gsearch-item.active');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const idx = active ? items.indexOf(active) : -1;
+    const next = items[idx + 1];
+    if (next) { active?.classList.remove('active'); next.classList.add('active'); next.scrollIntoView({block:'nearest'}); }
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const idx = active ? items.indexOf(active) : items.length;
+    const prev = items[idx - 1];
+    if (prev) { active?.classList.remove('active'); prev.classList.add('active'); prev.scrollIntoView({block:'nearest'}); }
+  }
+}
+
+function _doGlobalSearch(q) {
+  const resultsEl = document.getElementById('gsearch-results');
+  if (!resultsEl) return;
+  const query = (q || '').toLowerCase().trim();
+  if (!query) {
+    resultsEl.innerHTML = `<div style="padding:24px 18px;color:var(--text-muted);font-size:13px;text-align:center">Søk i prosjekter, kunder, notater og dokumenter</div>`;
+    return;
+  }
+
+  const hits = [];
+
+  // Prosjekter
+  DB.projects.forEach(p => {
+    const c = DB.customers.find(x => x.id === p.customerId);
+    const score = (p.name.toLowerCase().includes(query) ? 3 : 0)
+      + ((p.description||'').toLowerCase().includes(query) ? 1 : 0)
+      + ((c?.name||'').toLowerCase().includes(query) ? 2 : 0)
+      + ((p.dealId||'').toLowerCase().includes(query) ? 2 : 0);
+    if (score > 0) hits.push({ score, type: 'prosjekt', icon: '📁', title: p.name, sub: c ? c.name : '', cb: `navigate('project-detail',{projectId:'${p.id}'});closeGlobalSearch()` });
+  });
+
+  // Kunder
+  DB.customers.forEach(c => {
+    const score = (c.name.toLowerCase().includes(query) ? 3 : 0)
+      + ((c.contact||'').toLowerCase().includes(query) ? 1 : 0)
+      + ((c.email||'').toLowerCase().includes(query) ? 1 : 0)
+      + ((c.notes||'').toLowerCase().includes(query) ? 1 : 0);
+    if (score > 0) hits.push({ score, type: 'kunde', icon: '👤', title: c.name, sub: c.contact || c.email || '', cb: `navigate('customer-detail',{customerId:'${c.id}'});closeGlobalSearch()` });
+  });
+
+  // Notater
+  DB.notes.forEach(n => {
+    if (!(n.text||'').toLowerCase().includes(query)) return;
+    const p = DB.projects.find(x => x.id === n.projectId);
+    const snippet = (() => {
+      const idx = n.text.toLowerCase().indexOf(query);
+      const start = Math.max(0, idx - 30);
+      const end = Math.min(n.text.length, idx + 60);
+      return (start > 0 ? '…' : '') + n.text.slice(start, end) + (end < n.text.length ? '…' : '');
+    })();
+    hits.push({ score: 2, type: 'notat', icon: '📝', title: snippet, sub: p ? p.name : '', cb: p ? `navigate('project-detail',{projectId:'${p.id}'});closeGlobalSearch()` : 'closeGlobalSearch()' });
+  });
+
+  // Dokumenter
+  DB.documents.forEach(d => {
+    const nameHit  = (d.name||'').toLowerCase().includes(query);
+    const textHit  = (d.text||'').toLowerCase().includes(query);
+    if (!nameHit && !textHit) return;
+    const p = DB.projects.find(x => x.id === d.projectId);
+    const snippet = textHit ? (() => {
+      const t = d.text || '';
+      const idx = t.toLowerCase().indexOf(query);
+      const start = Math.max(0, idx - 25);
+      const end = Math.min(t.length, idx + 50);
+      return (start > 0 ? '…' : '') + t.slice(start, end) + (end < t.length ? '…' : '');
+    })() : '';
+    hits.push({ score: nameHit ? 3 : 1, type: 'dokument', icon: '📄', title: d.name, sub: snippet || (p ? p.name : ''), cb: p ? `navigate('project-detail',{projectId:'${p.id}'});closeGlobalSearch()` : 'closeGlobalSearch()' });
+  });
+
+  // Oppgaver
+  DB.tasks.forEach(t => {
+    const score = (t.name.toLowerCase().includes(query) ? 2 : 0)
+      + ((t.description||'').toLowerCase().includes(query) ? 1 : 0);
+    if (!score) return;
+    const p = DB.projects.find(x => x.id === t.projectId);
+    hits.push({ score, type: 'oppgave', icon: '✓', title: t.name, sub: p ? p.name : '', cb: p ? `navigate('project-detail',{projectId:'${p.id}'});closeGlobalSearch()` : 'closeGlobalSearch()' });
+  });
+
+  hits.sort((a, b) => b.score - a.score);
+  const shown = hits.slice(0, 12);
+
+  if (!shown.length) {
+    resultsEl.innerHTML = `<div style="padding:24px 18px;color:var(--text-muted);font-size:13px;text-align:center">Ingen treff på «${escHtml(q)}»</div>`;
+    return;
+  }
+
+  const typeColors = { prosjekt: '#2563eb', kunde: '#059669', notat: '#d97706', dokument: '#7c3aed', oppgave: '#6b7280' };
+  resultsEl.innerHTML = shown.map((h, i) => `
+    <div class="gsearch-item${i===0?' active':''}" onclick="${h.cb}" tabindex="-1"
+      style="display:flex;gap:12px;align-items:flex-start;padding:10px 18px;cursor:pointer;transition:background .1s"
+      onmouseenter="document.querySelectorAll('.gsearch-item').forEach(el=>el.classList.remove('active'));this.classList.add('active')"
+      onmouseleave="">
+      <span style="font-size:16px;flex-shrink:0;padding-top:1px">${h.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(h.title)}</div>
+        ${h.sub ? `<div style="font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">${escHtml(h.sub)}</div>` : ''}
+      </div>
+      <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:${typeColors[h.type]||'#6b7280'}22;color:${typeColors[h.type]||'#6b7280'};flex-shrink:0;align-self:center">${h.type}</span>
+    </div>`).join('');
+}
+
+// Global søk: Cmd/Ctrl+K
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    openGlobalSearch();
+  }
+  if (e.key === 'Escape' && document.getElementById('gsearch-overlay')?.style.display !== 'none') {
+    closeGlobalSearch();
+  }
+});
 
 /* ============================================================
    INIT
