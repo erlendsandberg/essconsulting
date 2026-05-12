@@ -3580,6 +3580,7 @@ function renderProjectDetail(id) {
         <button class="btn btn-ghost btn-sm" style="color:var(--blue);border:1.5px solid var(--blue)" onclick="openProjectReport('${p.id}')">📄 Rapport</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--green);border:1.5px solid var(--green)" onclick="generateOppdragsPDF('${p.id}')">📑 Engasjementsbrev</button>
         <button class="btn btn-ghost btn-sm" style="color:#7c3aed;border:1.5px solid #7c3aed" onclick="openTimeoversiktModal('${p.id}')">🧾 Timeoversikt</button>
+        <button class="btn btn-ghost btn-sm" style="color:#0891b2;border:1.5px solid #0891b2" onclick="openFakturatekstModal('${p.id}')">💳 Fakturatekst</button>
         <button class="btn btn-ghost btn-sm" style="color:#06b6d4;border:1.5px solid #06b6d4" onclick="openVeraMeetingPrep('${p.id}')">🗓 Møteforberedelse</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="confirmDelete('project','${p.id}')">🗑️</button>
       </div>
@@ -5811,8 +5812,23 @@ Bruk prosjektnavnet NØYAKTIG som det står i dataene — det brukes til oppslag
    ============================================================ */
 
 let _veraChatOpen   = false;
-let _veraChatHistory = []; // {role, content}
 let _veraSuggestionsLoaded = false;
+
+// Last inn historikk fra localStorage
+const _VERA_HISTORY_KEY = 'ess_vera_history';
+let _veraChatHistory = (() => {
+  try {
+    const saved = localStorage.getItem(_VERA_HISTORY_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch { return []; }
+})();
+
+function _saveVeraHistory() {
+  try {
+    // Behold maks 20 siste meldinger
+    localStorage.setItem(_VERA_HISTORY_KEY, JSON.stringify(_veraChatHistory.slice(-20)));
+  } catch(e) { console.warn('Vera historikk-lagring feilet:', e); }
+}
 
 function toggleVeraChat() {
   _veraChatOpen = !_veraChatOpen;
@@ -5837,8 +5853,25 @@ async function _initVeraChat() {
   const msgsEl = document.getElementById('vera-messages');
   if (!msgsEl) return;
 
-  // Velkomstmelding
-  _appendVeraMsg('vera', 'Hei Erlend 👋 Hva kan jeg hjelpe deg med i dag?');
+  // Velkomstmelding — tilpass om det finnes historikk
+  if (_veraChatHistory.length > 0) {
+    // Gjenvis historikk
+    const msgsForDisplay = _veraChatHistory.slice(-10);
+    msgsForDisplay.forEach(m => {
+      const div = document.createElement('div');
+      div.className = `vera-msg ${m.role === 'user' ? 'user' : 'vera'}`;
+      div.style.opacity = '0.7';
+      if (m.role === 'assistant') { div.innerHTML = _mdToHtml(m.content); }
+      else { div.textContent = m.content; }
+      msgsEl?.appendChild(div);
+    });
+    const lastUserMsg = [..._veraChatHistory].reverse().find(m => m.role === 'user');
+    if (lastUserMsg) {
+      _appendVeraMsg('vera', `Velkommen tilbake 👋 Vi snakket sist om: *${lastUserMsg.content.slice(0,60)}${lastUserMsg.content.length>60?'…':''}*`);
+    }
+  } else {
+    _appendVeraMsg('vera', 'Hei Erlend 👋 Hva kan jeg hjelpe deg med i dag?');
+  }
 
   // Loading-indikator for forslag
   const loadId = 'vera-sug-loading';
@@ -5980,7 +6013,17 @@ function _appendVeraMsg(role, text) {
   msgsEl.scrollTop = msgsEl.scrollHeight;
   if (role !== 'vera-loading') {
     _veraChatHistory.push({ role: role === 'user' ? 'user' : 'assistant', content: text });
+    _saveVeraHistory();
   }
+}
+
+function _clearVeraHistory() {
+  _veraChatHistory = [];
+  localStorage.removeItem(_VERA_HISTORY_KEY);
+  const msgsEl = document.getElementById('vera-messages');
+  if (msgsEl) msgsEl.innerHTML = '';
+  _veraSuggestionsLoaded = false;
+  _initVeraChat();
 }
 
 async function sendVeraMessage() {
@@ -6276,6 +6319,27 @@ function _buildOppdragsPDF(p, c, typeLabel) {
     y += 4;
   }
 
+  // ── Omfang og leveranser (fra fasemal) ──────────────────
+  const tmplForPDF = p.projectType ? PHASE_TEMPLATES[p.projectType] : null;
+  if (tmplForPDF && tmplForPDF.phases) {
+    checkNewPage(y + 20);
+    setFont('bold', 10.5);
+    text('Omfang og leveranser', marginL, y); y += 5;
+    setFont('normal', 10);
+    const omfangIntro = `Oppdraget gjennomføres i ${tmplForPDF.phases.length} faser med følgende hovedelementer:`;
+    y = wrapText(omfangIntro, marginL, y, contentW, 5.5) + 3;
+    tmplForPDF.phases.forEach(phase => {
+      checkNewPage(y + 12);
+      setFont('bold', 9.5);
+      text(`${phase.nr}. ${phase.name}`, marginL + 4, y); y += 4.5;
+      if (phase.description) {
+        setFont('normal', 9.5);
+        y = wrapText(phase.description, marginL + 8, y, contentW - 8, 5) + 1;
+      }
+    });
+    y += 4;
+  }
+
   // ── Ansvarlig ────────────────────────────────────────────
   setFont('bold', 10.5);
   text('Ansvarlig for oppdraget', marginL, y); y += 5;
@@ -6334,27 +6398,38 @@ function _buildOppdragsPDF(p, c, typeLabel) {
   });
 
   // ── Signaturer ───────────────────────────────────────────
-  checkNewPage(y + 50);
+  checkNewPage(y + 70);
   y += 8;
-  hLine(y); y += 8;
+  hLine(y); y += 10;
 
   setFont('bold', 10.5);
-  text('ESS Consulting AS', marginL, y); y += 6;
-  setFont('normal', 10);
-  text((p.consultant || 'Erlend Synnes-Sandberg') + ', daglig leder', marginL, y); y += 5;
-  text('(elektronisk signert)', marginL, y); y += 14;
+  text('Signaturer', marginL, y); y += 6;
 
-  setFont('bold', 10.5);
-  text('Bekreftelse av vilkår', marginL, y); y += 5;
   setFont('normal', 10);
-  const bekrTekst = 'Vi ber om at dere underskriver elektronisk for å bekrefte at dere forstår, og samtykker i, vilkårene i avtalen.';
-  y = wrapText(bekrTekst, marginL, y, contentW, 5.5) + 8;
+  const sigDateStr = 'Sted/dato: Hamar, ___________';
 
-  setFont('bold', 10.5);
-  text(c?.name || 'Oppdragsgiver', marginL, y); y += 6;
-  setFont('normal', 10);
-  text('Daglig leder / kontaktperson', marginL, y); y += 5;
-  text('(elektronisk signert)', marginL, y);
+  // ESS Consulting signatur (venstre)
+  const sigL = marginL;
+
+  text(sigDateStr, sigL, y); y += 12;
+  hLine(y, LGRAY);
+  y += 5;
+  setFont('bold', 10);
+  text('ESS Consulting AS', sigL, y); y += 5;
+  setFont('normal', 9.5);
+  text(p.consultant || 'Erlend Synnes-Sandberg', sigL, y); y += 4.5;
+  text('Autorisert finansanalytiker (AFA)', sigL, y); y += 4.5;
+  text('Daglig leder', sigL, y); y += 14;
+
+  // Oppdragsgiver signatur
+  hLine(y, LGRAY);
+  y += 5;
+  setFont('bold', 10);
+  text(c?.name || 'Oppdragsgiver', sigL, y); y += 5;
+  setFont('normal', 9.5);
+  text(c?.contact || 'Daglig leder / kontaktperson', sigL, y); y += 5;
+  setFont('italic', 9, GRAY);
+  text('Ved å signere bekrefter oppdragsgiver at vilkårene er lest og akseptert.', sigL, y);
 
   // Footer på alle sider
   const pageCount = doc.getNumberOfPages();
@@ -7615,16 +7690,19 @@ function openQuickLogModal() {
     </div>
     <div class="form-group">
       <label>Type</label>
-      <select class="form-control" id="ql-type">
+      <select class="form-control" id="ql-type" onchange="_qlTypeChanged(this.value)">
         <option value="notat">📝 Statusoppdatering</option>
-        <option value="notat">📞 Telefonsamtale</option>
-        <option value="notat">🤝 Møte</option>
-        <option value="notat">✉️ E-post sendt</option>
-        <option value="notat">📄 Dokument levert</option>
+        <option value="telefon">📞 Telefonsamtale</option>
+        <option value="mote">🤝 Møte</option>
+        <option value="epost">✉️ E-post sendt</option>
+        <option value="dokument">📄 Dokument levert</option>
       </select>
     </div>
+    <div id="ql-mote-hint" style="display:none;font-size:11.5px;color:var(--blue);background:var(--blue-pale);border-radius:6px;padding:8px 12px;margin-bottom:8px">
+      💡 Vera kan generere et strukturert møtereferat fra stikkordene dine etter lagring
+    </div>
     <div class="form-group">
-      <label>Hva skjedde?</label>
+      <label id="ql-text-label">Hva skjedde?</label>
       <textarea class="form-control" id="ql-text" rows="3"
         placeholder="Kort beskrivelse av aktiviteten…"></textarea>
     </div>
@@ -7640,19 +7718,109 @@ function saveQuickLog() {
   const projId = document.getElementById('ql-project')?.value;
   const typeEl = document.getElementById('ql-type');
   const text   = document.getElementById('ql-text')?.value.trim();
+  const typeVal = typeEl?.value || 'notat';
 
   if (!projId) { showToast('Velg et prosjekt', 'error'); return; }
   if (!text)   { showToast('Skriv hva som skjedde', 'error'); return; }
 
-  const typeLabel = typeEl?.options[typeEl.selectedIndex]?.text || '';
+  const typeLabel = typeEl?.options[typeEl.selectedIndex]?.text.replace(/^[^\s]+ /,'') || '';
 
   // Logg til aktivitetslogg
   logActivity('notat', projId, typeLabel ? `${typeLabel}: ${text}` : text);
 
-  // Lagre også som notat
-  const note = { id: uid(), projectId: projId, text: `${typeLabel ? typeLabel+': ' : ''}${text}`, createdAt: now() };
-  DB.notes.push(note);
-  persistAll({ toast: 'Aktivitet logget ✓' });
+  if (typeVal === 'mote') {
+    // Møte: generer strukturert referat med AI
+    _generateMeetingNote(projId, text, typeLabel);
+  } else {
+    const note = { id: uid(), projectId: projId, text: `${typeLabel ? typeLabel+': ' : ''}${text}`, createdAt: now() };
+    DB.notes.push(note);
+    persistAll({ toast: 'Aktivitet logget ✓' });
+    closeModal();
+    render();
+  }
+}
+
+function _qlTypeChanged(val) {
+  const hint = document.getElementById('ql-mote-hint');
+  const label = document.getElementById('ql-text-label');
+  const textarea = document.getElementById('ql-text');
+  if (hint) hint.style.display = val === 'mote' ? 'block' : 'none';
+  if (label && textarea) {
+    if (val === 'mote') {
+      label.textContent = 'Stikkord fra møtet';
+      textarea.placeholder = 'Hvem deltok, hva ble diskutert, hva ble besluttet…';
+    } else if (val === 'telefon') {
+      label.textContent = 'Hva ble diskutert?';
+      textarea.placeholder = 'Kort oppsummering av samtalen…';
+    } else {
+      label.textContent = 'Hva skjedde?';
+      textarea.placeholder = 'Kort beskrivelse av aktiviteten…';
+    }
+  }
+}
+
+async function _generateMeetingNote(projId, stikkord, typeLabel) {
+  const p = DB.projects.find(x => x.id === projId);
+  const c = DB.customers.find(x => x.id === p?.customerId);
+
+  // Vis loading-tilstand i modal
+  document.getElementById('modalBody').innerHTML = `
+    <div style="text-align:center;padding:40px 24px;color:var(--text-muted)">
+      <div style="margin-bottom:12px">${_ICON_AI_LG}</div>
+      <div style="font-weight:500;margin-bottom:6px">Vera skriver møtereferat…</div>
+      <div style="font-size:12px">${escHtml(stikkord.slice(0,80))}</div>
+    </div>`;
+
+  try {
+    const prompt = `Skriv et kort og profesjonelt møtereferat på norsk basert på disse stikkordene.
+
+Prosjekt: ${p?.name || ''}
+Kunde: ${c?.name || ''}
+Dato: ${new Date().toLocaleDateString('nb-NO',{day:'numeric',month:'long',year:'numeric'})}
+Stikkord fra møtet: ${stikkord}
+
+Format (bruk disse overskriftene):
+**Møtedeltakere:** [list opp om nevnt, ellers «not specified»]
+**Agenda/tema:** [fra stikkord]
+**Diskusjon og beslutninger:** [strukturerte kulepunkter]
+**Neste steg:** [handlingspunkter med ansvarlig om mulig]
+
+Hold det kort og konkret. Maks 150 ord.`;
+
+    const result = await callAI(prompt, 400);
+    const noteText = result.trim();
+
+    // Lagre som notat
+    const note = { id: uid(), projectId: projId, text: `🤝 Møtereferat:\n${noteText}`, createdAt: now() };
+    DB.notes.push(note);
+    persistAll();
+
+    // Vis resultatet i modal med mulighet til å redigere
+    document.getElementById('modalTitle').textContent = '🤝 Møtereferat generert';
+    document.getElementById('modalBody').innerHTML = `
+      <div style="margin-bottom:12px;font-size:13px;color:var(--text-muted)">Lagret som notat på prosjektet. Du kan redigere under.</div>
+      <textarea class="form-control" id="meeting-note-edit" rows="10" style="font-size:13px;font-family:inherit">${escHtml(noteText)}</textarea>
+      <div class="form-actions" style="margin-top:12px">
+        <button class="btn btn-secondary" onclick="closeModal();render()">Ferdig</button>
+        <button class="btn btn-primary" onclick="_saveMeetingNoteEdit('${note.id}')">Lagre endringer</button>
+      </div>`;
+  } catch(e) {
+    // Fallback: lagre stikkord direkte
+    const note = { id: uid(), projectId: projId, text: `${typeLabel}: ${stikkord}`, createdAt: now() };
+    DB.notes.push(note);
+    persistAll({ toast: 'Møtenotat lagret ✓' });
+    closeModal();
+    render();
+  }
+}
+
+function _saveMeetingNoteEdit(noteId) {
+  const edited = document.getElementById('meeting-note-edit')?.value.trim();
+  const note = DB.notes.find(n => n.id === noteId);
+  if (note && edited) {
+    note.text = `🤝 Møtereferat:\n${edited}`;
+    persistAll({ toast: 'Møtereferat lagret ✓' });
+  }
   closeModal();
   render();
 }
@@ -9714,6 +9882,7 @@ ${totalHours > 0
   ? `Lag et realistisk timeoversiktsforslag for fakturavedlegg. Grupper gjerne relaterte oppgaver i meningsfulle aktivitetslinjer (5–12 linjer totalt). Timene skal summere til nøyaktig ${totalHours} t.`
   : `Lag et realistisk timeoversiktsforslag for fakturavedlegg basert på hva som faktisk er levert. Estimer timene per aktivitet selv ut fra arbeidets kompleksitet og omfang (typisk M&A-oppdrag: 10–25 t totalt). Grupper i 5–12 meningsfulle aktivitetslinjer.`}
 
+${p._timeoversiktFeedback ? `\nBRUKERINNSPILL (tilpass forslaget etter dette): ${p._timeoversiktFeedback}\n` : ''}
 Svar KUN med et JSON-array — ingen forklaring, ingen markdown, kun JSON:
 [{"aktivitet":"...","periode":"...","timer":X.X}, ...]
 
@@ -9891,15 +10060,52 @@ function _saveTimeoversiktToProject() {
 function _aiRegenerTimeoversikt(projectId) {
   const p = DB.projects.find(x => x.id === projectId);
   if (!p) return;
+  const c = DB.customers.find(x => x.id === p.customerId);
+
+  // Vis dialog der bruker kan si hva som skal endres
+  const feedbackId = 'to-regen-feedback';
+  const currentSummary = _timeoversiktLines.length
+    ? `${_timeoversiktLines.length} linjer, ${_timeoversiktLines.reduce((s,l)=>s+(Number(l.timer)||0),0).toLocaleString('nb-NO',{minimumFractionDigits:1,maximumFractionDigits:1})} t totalt`
+    : 'Ingen linjer';
+
+  document.getElementById('modalBody').innerHTML = `
+    <div style="padding:20px 0 8px">
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
+        ${_ICON_AI} Nåværende forslag: <strong>${currentSummary}</strong>
+      </div>
+      <div class="form-group">
+        <label style="font-size:13px">Hva vil du endre?</label>
+        <textarea id="${feedbackId}" class="form-control" rows="3"
+          placeholder="F.eks. «legg til 3 timer for kundemøter», «reduser analysen til 8 timer», «splitt dokumentasjon i to linjer»…"
+          style="font-size:13px"></textarea>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:16px">
+        Vera regenererer basert på ditt innspill og eksisterende prosjektdata. La stå tomt for å starte helt på nytt.
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-secondary" onclick="openTimeoversiktModal('${projectId}')">Avbryt</button>
+        <button class="btn btn-primary" id="to-regen-btn" onclick="_doAiRegener('${projectId}')">${_ICON_AI} Regenerer</button>
+      </div>
+    </div>`;
+}
+
+function _doAiRegener(projectId) {
+  const p = DB.projects.find(x => x.id === projectId);
+  if (!p) return;
+  const c = DB.customers.find(x => x.id === p.customerId);
+  const feedback = document.getElementById('to-regen-feedback')?.value.trim() || '';
+
+  // Lagre feedback på prosjektet for bruk i prompt
+  p._timeoversiktFeedback = feedback;
   p.timeoversiktLines = [];
   _timeoversiktLines = [];
   persistAll();
-  const c = DB.customers.find(x => x.id === p.customerId);
+
   document.getElementById('modalBody').innerHTML = `
     <div style="text-align:center;padding:48px 24px;color:var(--text-muted)">
       <div style="margin-bottom:12px">${_ICON_AI_LG}</div>
-      <div style="font-weight:500;margin-bottom:6px">Vera analyserer prosjektet…</div>
-      <div style="font-size:12px">Genererer nytt forslag basert på oppdatert prosjektdata.</div>
+      <div style="font-weight:500;margin-bottom:6px">Vera tilpasser timeoversikten…</div>
+      <div style="font-size:12px">${feedback ? `«${feedback}»` : 'Genererer nytt forslag basert på prosjektdata.'}</div>
     </div>`;
   _aiTimeoversiktForslag(p, c);
 }
@@ -9994,16 +10200,44 @@ function _doTimeoversiktPdf(p, c, lines) {
   const W = 210, lm = 20, rm = 20, cw = W - lm - rm;
   const ts = p.timesats || 2600;
 
-  // ── Header-boks ──────────────────────────────────────────────
+  // ── Header: toppstripe ────────────────────────────────────
   doc.setFillColor(26, 43, 76);
-  doc.rect(lm, 15, cw, 28, 'F');
+  doc.rect(0, 0, W, 12, 'F');
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16); doc.setFont('helvetica', 'bold');
-  doc.text('TIMEOVERSIKT', W / 2, 26, { align: 'center' });
-  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-  doc.text(`${c?.name || ''} \u2013 ${p.name}`, W / 2, 33, { align: 'center' });
-  doc.setFontSize(8);
-  doc.text('ESS Consulting AS  |  Erlend Synnes-Sandberg AFA', W / 2, 39, { align: 'center' });
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+  doc.text('ESS CONSULTING AS', lm, 7.5);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+  const _dato = new Date().toLocaleDateString('nb-NO', { day:'2-digit', month:'long', year:'numeric' });
+  doc.text(_dato, W - rm, 7.5, { align: 'right' });
+
+  // ── Tittelblokk ───────────────────────────────────────────
+  doc.setTextColor(26, 43, 76);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+  doc.text('TIMEOVERSIKT', lm, 30);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(80, 80, 80);
+  doc.text((c?.name || '') + (p.name ? '  ·  ' + p.name : ''), lm, 38);
+  if (p.dealId) { doc.setFontSize(8); doc.text('Deal: ' + p.dealId, lm, 43); }
+
+  // Høyre kolonne: prosjektdetaljer
+  doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+  let _rY = 24;
+  const _rX = W - rm;
+  if (p.startDate) { doc.text('Oppstart: ' + p.startDate.slice(0,10), _rX, _rY, {align:'right'}); _rY += 4.5; }
+  if (p.endDate)   { doc.text('Sluttdato: ' + p.endDate.slice(0,10),  _rX, _rY, {align:'right'}); _rY += 4.5; }
+  if (p.honorarAvtalt) { doc.text('Honorar: NOK ' + Number(p.honorarAvtalt).toLocaleString('nb-NO'), _rX, _rY, {align:'right'}); }
+
+  // Skillelinje
+  doc.setDrawColor(26, 43, 76); doc.setLineWidth(0.6);
+  doc.line(lm, 47, W - rm, 47);
+
+  // Footer-funksjon (kalles på siste side)
+  const _addPdfFooter = () => {
+    doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.2);
+    doc.line(lm, 284, W - rm, 284);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(150, 150, 150);
+    doc.text('ESS Consulting AS  |  Org.nr: 932 466 090 MVA  |  Storhamargata 112A, 2315 Hamar  |  essc.no', W/2, 289, {align:'center'});
+    doc.text('Side ' + doc.getCurrentPageInfo().pageNumber, W - rm, 289, {align:'right'});
+  };
 
   // ── Tabell-header ────────────────────────────────────────────
   // Kolonner definert ved venstre-kant (akt, per) og høyre-kant (tim, sats, belop)
@@ -10013,7 +10247,7 @@ function _doTimeoversiktPdf(p, c, lines) {
   const colTimR = 152;         // høyre kant timer
   const colSatR = 170;         // høyre kant timesats
   const colBelR = W - rm;      // høyre kant beløp = 190
-  let y = 52;
+  let y = 54;
   doc.setFillColor(230, 234, 241);
   doc.rect(lm, y - 5, cw, 7, 'F');
   doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
@@ -10095,9 +10329,84 @@ function _doTimeoversiktPdf(p, c, lines) {
     doc.text('Timer er avrundet til nærmeste halve time.', lm, fotY);
   }
 
+  // Footer på alle sider
+  const _pageCount = doc.getNumberOfPages();
+  for (let _pi = 1; _pi <= _pageCount; _pi++) { doc.setPage(_pi); _addPdfFooter(); }
+
   const dato = new Date().toISOString().slice(0, 10);
   doc.save(`timeoversikt_${(c?.name || 'prosjekt').replace(/\s+/g,'_')}_${dato}.pdf`);
   showToast('Timeoversikt eksportert', 'success');
+}
+
+/* ============================================================
+   FAKTURATEKST-GENERATOR
+   ============================================================ */
+async function openFakturatekstModal(projectId) {
+  const p = DB.projects.find(x => x.id === projectId);
+  const c = DB.customers.find(x => x.id === p?.customerId);
+  if (!p) return;
+
+  document.getElementById('modalTitle').textContent = '💳 Fakturatekst';
+  document.getElementById('modalBody').innerHTML = `
+    <div style="text-align:center;padding:40px 24px;color:var(--text-muted)">
+      <div style="margin-bottom:12px">${_ICON_AI_LG}</div>
+      <div style="font-weight:500;margin-bottom:6px">Vera genererer fakturatekst…</div>
+    </div>`;
+  openModal();
+
+  const avt   = Number(p.honorarAvtalt)   || 0;
+  const fakt  = Number(p.honorarFakturert) || 0;
+  const gjen  = avt - fakt;
+  const sats  = Number(p.timesats) || 2600;
+  const typeLabel = PROJECT_TYPES.find(t => t.key === p.projectType)?.label || 'rådgivning';
+
+  const prompt = `Skriv en kort og profesjonell fakturatekst på norsk for en norsk faktura.
+
+Oppdragsgiver: ${c?.name || ''}
+Oppdragstype: ${typeLabel}
+Prosjekt: ${p.name}
+Beskrivelse: ${p.description || ''}
+${avt > 0 ? `Avtalt honorar: NOK ${avt.toLocaleString('no-NO')} ekskl. MVA` : `Timesats: NOK ${sats.toLocaleString('no-NO')} per time ekskl. MVA`}
+${fakt > 0 ? `Tidligere fakturert: NOK ${fakt.toLocaleString('no-NO')}` : ''}
+${gjen > 0 && avt > 0 ? `Resterende honorar: NOK ${gjen.toLocaleString('no-NO')}` : ''}
+${p.startDate ? `Periode: ${p.startDate.slice(0,10)} – ${p.endDate?.slice(0,10) || 'pågående'}` : ''}
+
+Krav:
+- 1–3 setninger, maks 60 ord
+- Profesjonell og nøytral tone
+- Nevn hva som er levert (oppdragstype og kundenavn)
+- Inkluder periode om tilgjengelig
+- IKKE nevn MVA-sats i teksten (bare beløp)
+- Avslutt med «eks. MVA» eller «ekskl. MVA» etter beløpet
+- Svar med KUN fakturateksten — ingen forklaring, ingen overskrift`;
+
+  try {
+    const result = await callAI(prompt, 200);
+    const tekst = result.trim();
+
+    document.getElementById('modalBody').innerHTML = `
+      <div style="margin-bottom:10px;font-size:12px;color:var(--text-muted)">Kopi og tilpass ved behov.</div>
+      <textarea class="form-control" id="faktura-tekst-output" rows="5"
+        style="font-size:14px;font-family:inherit;line-height:1.6">${escHtml(tekst)}</textarea>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="
+          const el=document.getElementById('faktura-tekst-output');
+          navigator.clipboard?.writeText(el.value)||el.select();
+          showToast('Kopiert til utklippstavlen ✓','success')
+        ">📋 Kopier</button>
+        <button class="btn btn-ghost btn-sm" onclick="openFakturatekstModal('${p.id}')">↻ Generer nytt</button>
+        <button class="btn btn-secondary" onclick="closeModal()">Lukk</button>
+      </div>
+      ${avt > 0 ? `<div style="margin-top:14px;padding:10px 14px;background:var(--blue-pale);border-radius:8px;font-size:12px;color:var(--blue)">
+        <strong>Beløp:</strong> NOK ${gjen > 0 ? gjen.toLocaleString('no-NO') : avt.toLocaleString('no-NO')} eks. MVA
+        · MVA (25%): NOK ${Math.round((gjen||avt)*0.25).toLocaleString('no-NO')}
+        · <strong>Total: NOK ${Math.round((gjen||avt)*1.25).toLocaleString('no-NO')}</strong>
+      </div>` : ''}`;
+  } catch(e) {
+    document.getElementById('modalBody').innerHTML = `
+      <div style="color:var(--red);padding:20px">Kunne ikke generere fakturatekst. Prøv igjen.</div>
+      <div class="form-actions"><button class="btn btn-secondary" onclick="closeModal()">Lukk</button></div>`;
+  }
 }
 
 function openProjectReport(projectId) {
@@ -11730,6 +12039,7 @@ _supabaseInit.then(() => {
       <div class="vera-chat-head-name">Vera</div>
       <div class="vera-chat-head-sub" id="vera-chat-sub">AI-assistent · ESS Consulting</div>
     </div>
+    <button onclick="_clearVeraHistory()" title="Tøm historikk" style="background:none;border:none;cursor:pointer;font-size:11px;color:rgba(255,255,255,0.4);padding:2px 6px;border-radius:4px" onmouseenter="this.style.color='rgba(255,255,255,0.8)'" onmouseleave="this.style.color='rgba(255,255,255,0.4)'">🗑 Tøm</button>
     <button class="vera-chat-close" onclick="toggleVeraChat()">×</button>
   </div>
   <div id="vera-messages"></div>
