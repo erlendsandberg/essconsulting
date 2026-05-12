@@ -9359,17 +9359,30 @@ let _docFolderFilter = {};    // { [projId]: valgt mappe ('' = alle) }
 let _timeoversiktLines = [];
 let _timeoversiktProjId = null;
 let _timeoversiktFakturert = 0;
+let _timeoversiktMvaFritt = false;  // finansiell rådgivning er som regel MVA-fritatt
+let _timeoversiktMemo = '';          // fritekst-merknad til PDF
 
 function openTimeoversiktModal(projectId) {
   const p = DB.projects.find(x => x.id === projectId);
   if (!p) return;
   const c = DB.customers.find(x => x.id === p.customerId);
-  _timeoversiktProjId = projectId;
-  _timeoversiktFakturert = 0;
+  _timeoversiktProjId    = projectId;
+  _timeoversiktFakturert = p.timeoversiktFakturert ?? (p.honorarFakturert || 0);
+  _timeoversiktMvaFritt  = p.timeoversiktMvaFritt  ?? false;
+  _timeoversiktMemo      = p.timeoversiktMemo      ?? '';
 
-  // Vis spinner umiddelbart mens AI jobber
   document.getElementById('modal').style.maxWidth = '800px';
   document.getElementById('modalTitle').textContent = '🧾 Timeoversikt';
+
+  // Last lagrede linjer hvis de finnes — hopp over AI
+  if (p.timeoversiktLines && p.timeoversiktLines.length > 0) {
+    _timeoversiktLines = JSON.parse(JSON.stringify(p.timeoversiktLines));
+    openModal();
+    _renderTimeoversiktModal(p, c);
+    return;
+  }
+
+  // Ellers: la Vera generere forslag
   document.getElementById('modalBody').innerHTML = `
     <div style="text-align:center;padding:48px 24px;color:var(--text-muted)">
       <div style="margin-bottom:12px">${_ICON_AI_LG}</div>
@@ -9377,7 +9390,6 @@ function openTimeoversiktModal(projectId) {
       <div style="font-size:12px">Leser oppgaver, dokumenter og aktivitet — foreslår timefordeling.</div>
     </div>`;
   openModal();
-
   _aiTimeoversiktForslag(p, c);
 }
 
@@ -9505,10 +9517,13 @@ function _renderTimeoversiktModal(p, c) {
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div style="font-size:12px;color:var(--text-muted)">
         <strong>${escHtml(c?.name||'')}</strong> — ${escHtml(p.name)}
-        &nbsp;·&nbsp; Timesats NOK ${ts.toLocaleString('nb-NO')} + MVA
+        &nbsp;·&nbsp; Timesats NOK ${ts.toLocaleString('nb-NO')}${_timeoversiktMvaFritt ? ' (MVA-fritatt)' : ' + MVA'}
         ${honorar ? `&nbsp;·&nbsp; Avtalt honorar NOK ${honorar.toLocaleString('nb-NO')}` : ''}
       </div>
-      ${honorar ? `<button class="btn btn-secondary btn-sm" onclick="_fordeltimer('${p.id}')">↺ Fordel timer på nytt</button>` : ''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${honorar ? `<button class="btn btn-secondary btn-sm" onclick="_fordeltimer('${p.id}')">↺ Fordel timer</button>` : ''}
+        <button class="btn btn-secondary btn-sm" onclick="_aiRegenerTimeoversikt('${p.id}')" title="Slett lagrede linjer og la Vera generere nytt forslag">✦ Regenerer med AI</button>
+      </div>
     </div>
     ${!p.honorarAvtalt ? `
     <div style="background:#fffbeb;border:1px solid #B8742A;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:12px">
@@ -9532,6 +9547,10 @@ function _renderTimeoversiktModal(p, c) {
     </div>
     <button class="btn btn-ghost btn-sm" style="font-size:12px;margin-top:8px"
       onclick="_addTimeoversiktLine(${ts})">+ Legg til linje</button>
+    <div style="margin-top:10px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;gap:8px;font-size:13px">
+      <input type="checkbox" id="to-mva-fri" ${_timeoversiktMvaFritt ? 'checked' : ''} onchange="_toggleMvaFritt(this.checked)" style="cursor:pointer">
+      <label for="to-mva-fri" style="cursor:pointer;color:var(--text-muted)">MVA-fritatt <span style="color:var(--text-muted);font-size:11px">(finansiell rådgivning er normalt fritatt for merverdiavgift)</span></label>
+    </div>
     <div style="border-top:2px solid var(--border);margin-top:12px;padding-top:10px;font-size:13px" id="to-sums">
       <div style="display:flex;justify-content:space-between;padding:3px 8px;font-weight:600">
         <span>Sum timer / beløp ex. MVA</span>
@@ -9539,10 +9558,12 @@ function _renderTimeoversiktModal(p, c) {
           &nbsp;&nbsp; NOK ${sumBelop.toLocaleString('nb-NO')}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:3px 8px;color:var(--text-muted)">
-        <span>MVA (25 %)</span><span id="to-mva-val">NOK ${mva.toLocaleString('nb-NO')}</span>
+        <span id="to-mva-lbl">${_timeoversiktMvaFritt ? 'MVA' : 'MVA (25 %)'}</span>
+        <span id="to-mva-val">${_timeoversiktMvaFritt ? 'Fritatt' : 'NOK ' + mva.toLocaleString('nb-NO')}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:3px 8px;font-weight:700;font-size:14px">
-        <span>Totalt inkl. MVA</span><span id="to-total-val">NOK ${total.toLocaleString('nb-NO')}</span>
+        <span id="to-total-lbl">${_timeoversiktMvaFritt ? 'Totalt ex. MVA' : 'Totalt inkl. MVA'}</span>
+        <span id="to-total-val">NOK ${total.toLocaleString('nb-NO')}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px 3px;color:var(--text-muted);border-top:1px dashed var(--border);margin-top:6px">
         <span>Allerede fakturert</span>
@@ -9557,11 +9578,17 @@ function _renderTimeoversiktModal(p, c) {
       </div>
       <div id="to-diff-row">${diffHtml}</div>
     </div>
-    <div style="margin-top:16px;font-size:11px;color:var(--text-muted)">
-      <em>Merknad: Timer er avrundet til nærmeste halve time.</em>
+    <div style="margin-top:16px">
+      <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">Merknad til PDF (valgfri)</label>
+      <textarea class="form-control" style="font-size:12px;resize:vertical;min-height:52px;width:100%;box-sizing:border-box"
+        placeholder="F.eks.: Arbeid utført i henhold til engasjementsavtale av ${p.startDate ? new Date(p.startDate).toLocaleDateString('nb-NO') : '…'}. Alle leveranser er godkjent."
+        oninput="_setTimeoversiktMemo(this.value)">${escHtml(_timeoversiktMemo)}</textarea>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text-muted)">
+      <em>Timer er avrundet til nærmeste halve time. Linjer lagres automatisk.</em>
     </div>
     <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px">
-      <button class="btn btn-secondary" onclick="closeModal()">Avbryt</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Lukk</button>
       <button class="btn btn-primary" style="background:#7c3aed;border-color:#7c3aed"
         onclick="_exportTimeoversiktPdf('${p.id}')">⬇ Last ned PDF</button>
     </div>`;
@@ -9577,11 +9604,52 @@ function _fordeltimer(projectId) {
   _timeoversiktLines.forEach(l => { l.timer = Math.round((total / n) * 2) / 2; });
   const c = DB.customers.find(x => x.id === p.customerId);
   _renderTimeoversiktModal(p, c);
+  _saveTimeoversiktToProject();
+}
+
+// Lagrer gjeldende timeoversikt-tilstand til prosjektet (persistent)
+function _saveTimeoversiktToProject() {
+  const p = DB.projects.find(x => x.id === _timeoversiktProjId);
+  if (!p) return;
+  p.timeoversiktLines     = JSON.parse(JSON.stringify(_timeoversiktLines));
+  p.timeoversiktFakturert = _timeoversiktFakturert;
+  p.timeoversiktMvaFritt  = _timeoversiktMvaFritt;
+  p.timeoversiktMemo      = _timeoversiktMemo;
+  persistAll();
+}
+
+// Tøm lagrede linjer og la Vera generere på nytt
+function _aiRegenerTimeoversikt(projectId) {
+  const p = DB.projects.find(x => x.id === projectId);
+  if (!p) return;
+  p.timeoversiktLines = [];
+  _timeoversiktLines = [];
+  persistAll();
+  const c = DB.customers.find(x => x.id === p.customerId);
+  document.getElementById('modalBody').innerHTML = `
+    <div style="text-align:center;padding:48px 24px;color:var(--text-muted)">
+      <div style="margin-bottom:12px">${_ICON_AI_LG}</div>
+      <div style="font-weight:500;margin-bottom:6px">Vera analyserer prosjektet…</div>
+      <div style="font-size:12px">Genererer nytt forslag basert på oppdatert prosjektdata.</div>
+    </div>`;
+  _aiTimeoversiktForslag(p, c);
+}
+
+function _toggleMvaFritt(checked) {
+  _timeoversiktMvaFritt = checked;
+  _updateTimeoversiktSums();
+  _saveTimeoversiktToProject();
+}
+
+function _setTimeoversiktMemo(val) {
+  _timeoversiktMemo = val;
+  _saveTimeoversiktToProject();
 }
 
 function _toLine(i, field, val) {
   // Tekst-felt (aktivitet, periode) — kalles fra onchange, ingen re-render
   _timeoversiktLines[i][field] = val;
+  _saveTimeoversiktToProject();
 }
 function _toLineNum(i, field, val) {
   // Tall-felt (timer, timesats) — oppdater beløpscelle + totaler
@@ -9591,10 +9659,12 @@ function _toLineNum(i, field, val) {
   const cell = document.getElementById(`to-belop-${i}`);
   if (cell) cell.textContent = rowBelop ? rowBelop.toLocaleString('nb-NO') : '—';
   _updateTimeoversiktSums();
+  _saveTimeoversiktToProject();
 }
 function _setTimeoversiktFakturert(val) {
   _timeoversiktFakturert = Number(val) || 0;
   _updateTimeoversiktSums();
+  _saveTimeoversiktToProject();
 }
 function _updateTimeoversiktSums() {
   const p = DB.projects.find(x => x.id === _timeoversiktProjId);
@@ -9603,14 +9673,18 @@ function _updateTimeoversiktSums() {
   const honorar = p.honorarAvtalt || 0;
   const sumTimer = _timeoversiktLines.reduce((s, l) => s + (Number(l.timer) || 0), 0);
   const sumBelop = _timeoversiktLines.reduce((s, l) => s + (Number(l.timer)||0) * (Number(l.timesats)||0), 0);
-  const mva = Math.round(sumBelop * 0.25);
+  const mva = _timeoversiktMvaFritt ? 0 : Math.round(sumBelop * 0.25);
   const total = sumBelop + mva;
   const fakturert = _timeoversiktFakturert || 0;
   const el = id => document.getElementById(id);
   const sumTxt = el('to-sum-txt');
   if (sumTxt) sumTxt.innerHTML = `${sumTimer.toLocaleString('nb-NO',{minimumFractionDigits:1,maximumFractionDigits:1})} t &nbsp;&nbsp; NOK ${sumBelop.toLocaleString('nb-NO')}`;
   const mvaEl = el('to-mva-val');
-  if (mvaEl) mvaEl.textContent = `NOK ${mva.toLocaleString('nb-NO')}`;
+  if (mvaEl) mvaEl.textContent = _timeoversiktMvaFritt ? 'Fritatt' : `NOK ${mva.toLocaleString('nb-NO')}`;
+  const mvaLbl = el('to-mva-lbl');
+  if (mvaLbl) mvaLbl.textContent = _timeoversiktMvaFritt ? 'MVA' : 'MVA (25 %)';
+  const totalLbl = el('to-total-lbl');
+  if (totalLbl) totalLbl.textContent = _timeoversiktMvaFritt ? 'Totalt ex. MVA' : 'Totalt inkl. MVA';
   const totalEl = el('to-total-val');
   if (totalEl) totalEl.textContent = `NOK ${total.toLocaleString('nb-NO')}`;
   const denneRow = el('to-denne-row');
@@ -9630,13 +9704,13 @@ function _addTimeoversiktLine(ts) {
   _timeoversiktLines.push({ aktivitet: '', periode: '', timer: '', timesats: ts });
   const p = DB.projects.find(x => x.id === _timeoversiktProjId);
   const c = p ? DB.customers.find(x => x.id === p.customerId) : null;
-  if (p) _renderTimeoversiktModal(p, c);
+  if (p) { _renderTimeoversiktModal(p, c); _saveTimeoversiktToProject(); }
 }
 function _removeTimeoversiktLine(i) {
   _timeoversiktLines.splice(i, 1);
   const p = DB.projects.find(x => x.id === _timeoversiktProjId);
   const c = p ? DB.customers.find(x => x.id === p.customerId) : null;
-  if (p) _renderTimeoversiktModal(p, c);
+  if (p) { _renderTimeoversiktModal(p, c); _saveTimeoversiktToProject(); }
 }
 
 function _exportTimeoversiktPdf(projectId) {
@@ -9721,17 +9795,17 @@ function _doTimeoversiktPdf(p, c, lines) {
   doc.text(sumBelop.toLocaleString('nb-NO'), colBelR, y + 4, { align: 'right' });
 
   // ── MVA + Total ──────────────────────────────────────────────
-  const mva   = Math.round(sumBelop * 0.25);
+  const mva   = _timeoversiktMvaFritt ? 0 : Math.round(sumBelop * 0.25);
   const total = sumBelop + mva;
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
   y += 10;
-  doc.text('MVA (25 %)', colAkt + 1, y);
-  doc.text(mva.toLocaleString('nb-NO'), colBelR, y, { align: 'right' });
+  doc.text(_timeoversiktMvaFritt ? 'MVA' : 'MVA (25 %)', colAkt + 1, y);
+  doc.text(_timeoversiktMvaFritt ? 'Fritatt' : mva.toLocaleString('nb-NO'), colBelR, y, { align: 'right' });
   y += 6;
   doc.setFillColor(26, 43, 76);
   doc.rect(lm, y - 4.5, cw, 7, 'F');
   doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
-  doc.text('Totalt inkl. MVA', colAkt + 1, y + 0.5);
+  doc.text(_timeoversiktMvaFritt ? 'Totalt ex. MVA' : 'Totalt inkl. MVA', colAkt + 1, y + 0.5);
   doc.text(total.toLocaleString('nb-NO'), colBelR, y + 0.5, { align: 'right' });
 
   // ── Allerede fakturert / Denne faktura ──────────────────────
@@ -9749,9 +9823,18 @@ function _doTimeoversiktPdf(p, c, lines) {
     doc.text(denneFaktura.toLocaleString('nb-NO'), colBelR, y + 0.5, { align: 'right' });
   }
 
-  // ── Fotnote ──────────────────────────────────────────────────
-  doc.setTextColor(100, 100, 100); doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
-  doc.text('Merknad: Timer er avrundet til nærmeste halve time.', lm, y + 14);
+  // ── Merknad + Fotnote ────────────────────────────────────────
+  doc.setTextColor(100, 100, 100); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  const fotY = y + 14;
+  if (_timeoversiktMemo) {
+    const memoLines = doc.splitTextToSize(_timeoversiktMemo, cw);
+    doc.text(memoLines, lm, fotY);
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
+    doc.text('Timer er avrundet til nærmeste halve time.', lm, fotY + memoLines.length * 5 + 2);
+  } else {
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5);
+    doc.text('Timer er avrundet til nærmeste halve time.', lm, fotY);
+  }
 
   const dato = new Date().toISOString().slice(0, 10);
   doc.save(`timeoversikt_${(c?.name || 'prosjekt').replace(/\s+/g,'_')}_${dato}.pdf`);
