@@ -12,11 +12,15 @@
 <!-- Supabase JS client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+  // Demo-modus: aktiver med ?demo i URL — omgår Supabase/innlogging
+  const DEMO_MODE = new URLSearchParams(window.location.search).has('demo');
+
   // Nøkler hentes fra Netlify-funksjon — ikke hardkodet i kildekoden
   let _supabase;
   const _supabaseInit = fetch('/.netlify/functions/app-config')
     .then(r => r.json())
     .then(cfg => {
+      if (DEMO_MODE) return; // Demo-modus: hopp over Supabase-konfig
       if (!cfg.url || !cfg.key) throw new Error('Supabase URL eller nøkkel mangler i miljøvariabler');
       // Custom fetch med 12-sekunders timeout per kall — forhindrer at
       // Chrome-utvidelser blokkerer Supabase-kall permanent
@@ -32,6 +36,7 @@
       });
     })
     .catch(e => {
+      if (DEMO_MODE) return; // Demo-modus: ignorer konfig-feil
       console.error('Konfig-lasting feilet:', e);
       const msg = document.getElementById('fb-loading-msg');
       if (msg) msg.textContent = '⚠ Konfigurasjonsfeil – ta kontakt med administrator';
@@ -1804,6 +1809,18 @@ tr:hover td { background: #FAFAFA; }
 .login-btn:hover   { background: #1d4ed8; }
 .login-btn:disabled{ background: #1e3a5f; cursor: not-allowed; }
 .login-error { color: #f87171; font-size: 13px; margin-top: 12px; min-height: 20px; text-align:center; }
+/* Demo-banner */
+#demo-banner {
+  background: linear-gradient(90deg, #92400e, #b45309);
+  color: #fef3c7; font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  text-align: center; padding: 7px 20px; flex-shrink: 0;
+  border-bottom: 1px solid rgba(0,0,0,0.2);
+}
+#demo-banner a {
+  color: #fde68a; margin-left: 10px; font-weight: 400;
+  text-decoration: none; opacity: 0.9;
+}
+#demo-banner a:hover { opacity: 1; text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -1821,6 +1838,14 @@ tr:hover td { background: #FAFAFA; }
       autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="login-btn" id="login-btn" onclick="doLogin()">Logg inn</button>
     <div class="login-error" id="login-error"></div>
+    <div style="margin-top:22px;text-align:center">
+      <div style="color:rgba(255,255,255,0.25);font-size:11px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.07em">eller</div>
+      <a href="?demo" style="display:inline-block;padding:10px 28px;background:rgba(255,255,255,0.07);border:1.5px solid rgba(255,255,255,0.14);border-radius:8px;color:rgba(255,255,255,0.6);font-size:13px;font-weight:600;text-decoration:none;transition:all 0.15s"
+        onmouseover="this.style.background='rgba(255,255,255,0.12)';this.style.color='#fff'"
+        onmouseout="this.style.background='rgba(255,255,255,0.07)';this.style.color='rgba(255,255,255,0.6)'">
+        🎭 Prøv demo
+      </a>
+    </div>
   </div>
 </div>
 
@@ -1874,7 +1899,7 @@ tr:hover td { background: #FAFAFA; }
   <nav id="sidebar">
     <div class="sidebar-logo">
       <div class="brand">ESS Consulting AS</div>
-      <div class="sub">Prosjektstyring</div>
+      <div class="sub">Prosjektstyring<span id="demo-sidebar-badge" style="display:none;margin-left:7px;background:#b45309;color:#fef3c7;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:700;letter-spacing:.06em;vertical-align:middle">DEMO</span></div>
     </div>
     <div class="sidebar-nav">
       <div class="sidebar-section-label">Hoved</div>
@@ -1925,6 +1950,11 @@ tr:hover td { background: #FAFAFA; }
 
   <!-- MAIN -->
   <div id="main">
+    <!-- Demo-banner: vises kun når ?demo er i URL (settes av JS) -->
+    <div id="demo-banner" style="display:none">
+      🎭 Demo-modus · Ingen data lagres · Endringer forsvinner ved innlasting
+      <a href="/" title="Tilbake til innloggingssiden">✕ Avslutt demo</a>
+    </div>
     <header id="topbar">
       <button id="hamburger" onclick="toggleSidebar()">☰</button>
       <div class="page-title" id="pageTitle">Dashboard</div>
@@ -2006,6 +2036,7 @@ let _safeProjectCount  = null;
 let _safeCustomerCount = null;
 
 function persistAll(opts = {}) {
+  if (DEMO_MODE) { if (opts.toast) showToast(opts.toast, 'success'); return; } // No-op i demo
   if (opts.toast) _pendingToast = opts.toast;
   clearTimeout(_persistTimer);
   _persistTimer = setTimeout(async () => {
@@ -2098,6 +2129,7 @@ function _writeSnapshots(arr) {
 }
 
 function _maybeSaveLocalSnapshot() {
+  if (DEMO_MODE) return; // Ikke lagre snapshot i demo
   const snaps = _readSnapshots();
   const last = snaps[0];
   if (last && (Date.now() - new Date(last.ts).getTime()) < MIN_SNAPSHOT_INTERVAL_MS) return;
@@ -2146,6 +2178,7 @@ function restoreLocalSnapshot(index) {
 }
 
 async function loadAll() {
+  if (DEMO_MODE) return; // Demo: data er lastet via loadDemoData()
   try {
     const [
       { data: customers,  error: e1 },
@@ -10372,6 +10405,7 @@ async function doLogin() {
 }
 
 async function doLogout() {
+  if (DEMO_MODE) { window.location.href = window.location.pathname; return; }
   await _supabase.auth.signOut();
 }
 
@@ -11127,7 +11161,42 @@ const _globalInitGuard = setTimeout(() => {
   setTimeout(() => document.getElementById('login-email')?.focus(), 100);
 }, 15000);
 
+// ── Demo-modus: omgå Supabase-autentisering ────────────────────────────────
+if (DEMO_MODE) {
+  // No-op Supabase-stub — sikrer at confirmDelete(), resetAllData() etc. ikke krasjer
+  _supabase = {
+    from: () => ({
+      select: () => Object.assign(Promise.resolve({ data: null, error: null }), {
+        eq:          () => Promise.resolve({ data: null, error: null }),
+        order:       () => Promise.resolve({ data: [],   error: null }),
+        maybeSingle: () => Promise.resolve({ data: null, error: null }),
+      }),
+      upsert: () => Promise.resolve({ error: null }),
+      delete: () => ({
+        eq:  () => Promise.resolve({ error: null }),
+        in:  () => Promise.resolve({ error: null }),
+        gte: () => Promise.resolve({ error: null }),
+      }),
+    }),
+    auth: { onAuthStateChange: () => {}, signOut: async () => {} },
+  };
+  clearTimeout(_globalInitGuard);
+  const _dLoader  = document.getElementById('fb-loading');
+  const _dLogin   = document.getElementById('login-screen');
+  const _dShell   = document.getElementById('app-shell');
+  const _dBanner  = document.getElementById('demo-banner');
+  const _dBadge   = document.getElementById('demo-sidebar-badge');
+  if (_dLoader)  { _dLoader.style.opacity = '0'; setTimeout(() => _dLoader.remove(), 400); }
+  if (_dLogin)   _dLogin.style.display  = 'none';
+  if (_dShell)   _dShell.style.display  = 'flex';
+  if (_dBanner)  _dBanner.style.display = 'block';
+  if (_dBadge)   _dBadge.style.display  = 'inline';
+  _appInitialized = true;
+  loadDemoData(); // Fyller DB med demo-data + navigate('dashboard')
+}
+
 _supabaseInit.then(() => {
+  if (DEMO_MODE) return; // Demo-modus: ingen Supabase-autentisering
   if (!_supabase) return; // Init feilet — feilmelding er allerede vist i lasteskjermen
   _supabase.auth.onAuthStateChange(async (event, session) => {
   clearTimeout(_globalInitGuard); // Auth-flyten er i gang — kanseller sikkerhetsventilen
