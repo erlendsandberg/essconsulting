@@ -6268,10 +6268,8 @@ function _buildOppdragsPDF(p, c, typeLabel) {
   y += 8;
 
   // ── Tittel ───────────────────────────────────────────────
-  const subject = 'Engasjementsbrev – ' + p.name + (c ? ' – ' + c.name : '');
   setFont('bold', 11);
-  const titleLines = doc.splitTextToSize(subject, contentW);
-  titleLines.forEach(l => { doc.text(l, marginL, y); y += 6; });
+  doc.text('Engasjementsbrev', marginL, y); y += 6;
   y += 6;
 
   // ── Oppdraget ────────────────────────────────────────────
@@ -6281,8 +6279,10 @@ function _buildOppdragsPDF(p, c, typeLabel) {
   const oppdragTekst = `Vi har etter anmodning fra ${c?.name || 'oppdragsgiver'} (heretter «oppdragsgiver») påtatt oss følgende oppdrag:`;
   y = wrapText(oppdragTekst, marginL, y, contentW, 5.5) + 3;
 
-  // Oppdragsbeskrivelse som bullet
-  const desc = p.description || typeLabel;
+  // Oppdragsbeskrivelse som bullet — bruk beskrivelse fra prosjektet, aldri bare typeLabel
+  const desc = p.description
+    ? p.description
+    : `${typeLabel} for ${c?.name || 'oppdragsgiver'}`;
   setFont('normal', 10);
   const descLines = doc.splitTextToSize('•  ' + desc, contentW - 6);
   descLines.forEach(l => { doc.text(l, marginL + 4, y); y += 5.5; });
