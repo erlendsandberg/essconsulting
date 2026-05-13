@@ -6397,39 +6397,76 @@ function _buildOppdragsPDF(p, c, typeLabel) {
     y += 4;
   });
 
-  // ── Signaturer ───────────────────────────────────────────
-  checkNewPage(y + 70);
+  // ── Aksept og signering ──────────────────────────────────
+  checkNewPage(y + 90);
   y += 8;
   hLine(y); y += 10;
 
   setFont('bold', 10.5);
-  text('Signaturer', marginL, y); y += 6;
+  text('Aksept og signering', marginL, y); y += 7;
 
-  setFont('normal', 10);
-  const sigDateStr = 'Sted/dato: Hamar, ___________';
+  // Referanseboks
+  const refBoksY = y;
+  doc.setFillColor(244, 246, 250);
+  doc.setDrawColor(200, 206, 220);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(marginL, refBoksY, contentW, 20, 2, 2, 'FD');
+  setFont('normal', 8, [80, 90, 110]);
+  const _sigDato = new Date().toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' });
+  text('Referanse', marginL + 4, refBoksY + 6);
+  text('Dato', marginL + 60, refBoksY + 6);
+  text('Prosjekt', marginL + 110, refBoksY + 6);
+  setFont('bold', 9, [26, 43, 76]);
+  text(p.dealId || '–', marginL + 4, refBoksY + 13);
+  setFont('normal', 9, [26, 43, 76]);
+  text(_sigDato, marginL + 60, refBoksY + 13);
+  const _projShort = (p.name || '').slice(0, 30) + (p.name?.length > 30 ? '…' : '');
+  text(_projShort, marginL + 110, refBoksY + 13);
+  y = refBoksY + 26;
 
-  // ESS Consulting signatur (venstre)
-  const sigL = marginL;
-
-  text(sigDateStr, sigL, y); y += 12;
-  hLine(y, LGRAY);
-  y += 5;
-  setFont('bold', 10);
-  text('ESS Consulting AS', sigL, y); y += 5;
+  // ── Utstedt av ESS Consulting ────────────────────────────
+  setFont('bold', 9.5, BLACK);
+  text('Utstedt og bekreftet av', marginL, y); y += 5;
   setFont('normal', 9.5);
-  text(p.consultant || 'Erlend Synnes-Sandberg', sigL, y); y += 4.5;
-  text('Autorisert finansanalytiker (AFA)', sigL, y); y += 4.5;
-  text('Daglig leder', sigL, y); y += 14;
-
-  // Oppdragsgiver signatur
-  hLine(y, LGRAY);
+  text('ESS Consulting AS  ·  ' + (p.consultant || 'Erlend Synnes-Sandberg') + ', AFA  ·  erlend@essc.no', marginL, y);
   y += 5;
-  setFont('bold', 10);
-  text(c?.name || 'Oppdragsgiver', sigL, y); y += 5;
+  setFont('italic', 8.5, GRAY);
+  text('Brevet er utstedt av ESS Consulting AS og anses som bekreftet fra vår side ved utsendelse.', marginL, y);
+  y += 12;
+
+  // ── Aksept fra oppdragsgiver ─────────────────────────────
+  setFont('bold', 9.5, BLACK);
+  text('Aksept fra oppdragsgiver', marginL, y); y += 5;
   setFont('normal', 9.5);
-  text(c?.contact || 'Daglig leder / kontaktperson', sigL, y); y += 5;
-  setFont('italic', 9, GRAY);
-  text('Ved å signere bekrefter oppdragsgiver at vilkårene er lest og akseptert.', sigL, y);
+
+  const _akseptTekst = `Svar på e-posten du har mottatt med følgende tekst for å bekrefte aksept:`;
+  y = wrapText(_akseptTekst, marginL, y, contentW, 5) + 3;
+
+  // Sitat-boks med aksepttekst
+  const _quoteTekst = `«Jeg aksepterer vilkårene i engasjementsbrevet for ${p.name}` +
+    (p.dealId ? `, ref. ${p.dealId}` : '') + `, datert ${_sigDato}.»`;
+  const _quoteLines = doc.splitTextToSize(_quoteTekst, contentW - 12);
+  const _quoteH = _quoteLines.length * 5.5 + 8;
+  doc.setFillColor(237, 242, 255);
+  doc.setDrawColor(180, 195, 235);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(marginL, y - 2, contentW, _quoteH, 2, 2, 'FD');
+  setFont('italic', 9.5, [26, 43, 76]);
+  _quoteLines.forEach((l, i) => { text(l, marginL + 6, y + 4 + i * 5.5); });
+  y += _quoteH + 6;
+
+  // Kontaktlinje
+  setFont('normal', 8.5, GRAY);
+  text('Send til: erlend@essc.no  ·  Husk å oppgi referansenummer i emnefeltet.', marginL, y);
+  y += 5;
+
+  // Godkjent av (tom linje for manuell utfylling om nødvendig)
+  setFont('normal', 9, BLACK);
+  y += 4;
+  text('Godkjent av (navn):  _________________________________     Dato:  _______________', marginL, y);
+  y += 4;
+  setFont('italic', 8, GRAY);
+  text('(Fylles ut kun ved fysisk signering. E-post-aksept er juridisk likestilt og foretrekkes.)', marginL, y);
 
   // Footer på alle sider
   const pageCount = doc.getNumberOfPages();
