@@ -6261,10 +6261,6 @@ function _buildOppdragsPDF(p, c, typeLabel) {
      'september','oktober','november','desember'][today.getMonth()] +
     ' ' + today.getFullYear();
 
-  setFont('normal', 10);
-  text('Til ' + (p.customerTitle || 'styret i'), marginL, y);       y += 5.5;
-  text(c?.name || '', marginL, y);                                    y += 5.5;
-  if (c?.address) { text(c.address, marginL, y); y += 5.5; }
   y += 8;
 
   // ── Tittel ───────────────────────────────────────────────
