@@ -6269,7 +6269,7 @@ function _buildOppdragsPDF(p, c, typeLabel) {
 
   // ── Tittel ───────────────────────────────────────────────
   setFont('bold', 11);
-  doc.text('Engasjementsbrev', marginL, y); y += 6;
+  doc.text('Til ' + (c?.name || 'Oppdragsgiver'), marginL, y); y += 6;
   y += 6;
 
   // ── Oppdraget ────────────────────────────────────────────
