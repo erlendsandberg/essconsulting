@@ -1,6 +1,11 @@
 [build]
   functions = "netlify/functions"
 
+# Keep-alive: ping Supabase hver 5. dag kl. 08:00 UTC
+# Forhindrer automatisk pause på Supabase Free-plan (pauser etter 7 dager uten aktivitet)
+[functions.keepalive]
+  schedule = "0 8 */5 * *"
+
 
 [[headers]]
   for = "/netlify/functions/*"
